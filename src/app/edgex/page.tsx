@@ -35,12 +35,14 @@ export default function EdgeXPage() {
             setSelectedContractForOrderBook(processedData.assets[0].id);
           }
         } else {
-          throw new Error("Failed to process EdgeX exchange data.");
+          // This case should ideally be handled by getEdgeXProcessedData throwing an error
+          // if metadata or critical data fails to load.
+          throw new Error("Failed to process EdgeX exchange data or no assets returned.");
         }
       } catch (error: any) {
         console.error("Error loading initial EdgeX page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] }); 
+        setExchangeData({ assets: [] }); // Ensure assets is an empty array on error
       } finally {
         setIsLoadingPageData(false);
       }
@@ -49,16 +51,20 @@ export default function EdgeXPage() {
   }, []); 
 
   useEffect(() => {
-    if (pageError) return; 
+    if (pageError) { // Don't fetch if there was a page-level error
+      setLongShortRatio(null);
+      setIsLoadingRatio(false);
+      return;
+    }
 
     async function loadRatioData() {
       setIsLoadingRatio(true);
       try {
         const ratioDataResult = await fetchEdgeXLongShortRatio(selectedRangeForRatio);
         setLongShortRatio(ratioDataResult);
-      } catch (error) {
+      } catch (error) { // Catching errors from fetchEdgeXLongShortRatio if it throws
         console.warn(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
-        setLongShortRatio(null);
+        setLongShortRatio(null); // Set to null on error
       } finally {
         setIsLoadingRatio(false);
       }
@@ -67,13 +73,18 @@ export default function EdgeXPage() {
   }, [selectedRangeForRatio, pageError]);
 
   useEffect(() => {
-    if (pageError || !selectedContractForOrderBook) return;
+    if (pageError || !selectedContractForOrderBook) { // Don't fetch if page error or no symbol
+        setOrderBook(null); // Clear order book
+        setIsLoadingOrderBook(false);
+        return;
+    }
 
     async function loadOrderBookData() {
       setIsLoadingOrderBook(true);
       setOrderBook(null); 
       try {
-        const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20);
+        // Use a valid level for EdgeX API (15 or 200). Defaulting to 15.
+        const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 15); 
         setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
       } catch (error) {
         console.warn(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
@@ -110,7 +121,7 @@ export default function EdgeXPage() {
     );
   }
 
-  if (pageError) {
+  if (pageError && !isLoadingPageData) { // Show page error only after initial loading attempt
     return (
       <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
@@ -124,7 +135,7 @@ export default function EdgeXPage() {
             <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
             <h2 className="text-xl font-semibold text-destructive mb-2">Error Fetching Data</h2>
             <p className="text-muted-foreground">{pageError}</p>
-            <p className="text-sm text-muted-foreground mt-2">Please try again later.</p>
+            <p className="text-sm text-muted-foreground mt-2">Please try again later or check API status.</p>
           </CardContent>
         </Card>
       </div>
