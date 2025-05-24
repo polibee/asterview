@@ -84,8 +84,8 @@ export async function fetchEdgeXLongShortRatio(range: string = "1h"): Promise<Ed
     }
     const result: { data: EdgeXLongShortRatioData } = await response.json();
     return result.data;
-  } catch (error) {
-    console.error(`Failed to fetch EdgeX long/short ratio for range ${range}:`, error);
+  } catch (error) { // Catch network errors for fetch itself
+    console.warn(`Network error while fetching EdgeX long/short ratio for range ${range}:`, error);
     return null;
   }
 }
@@ -100,7 +100,7 @@ export async function fetchEdgeXOrderBook(contractId: string, level: number = 15
     const result: { data: EdgeXOrderBookData[] } = await response.json();
     return result.data;
   } catch (error) {
-    console.error(`Failed to fetch EdgeX order book for ${contractId}:`, error);
+    console.warn(`Network error while fetching EdgeX order book for ${contractId}:`, error);
     return null;
   }
 }
@@ -150,10 +150,9 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     
     const baseCoinInfo = coinMetaMap.get(contractInfo.baseCoinId);
     
-    // Prioritize iconUrl from coinList, then use contract baseCoin name for placeholder
     let iconUrl = baseCoinInfo?.iconUrl;
     if (!iconUrl) {
-      const baseCoinName = baseCoinInfo?.coinName || contractInfo.baseCoinId; // Use coinName if available
+      const baseCoinName = baseCoinInfo?.coinName || contractInfo.baseCoinId;
       iconUrl = `https://placehold.co/32x32.png?text=${baseCoinName.substring(0,3).toUpperCase()}`;
     }
     
@@ -170,7 +169,7 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
       priceChangePercent24h: parseFloatSafe(ticker.priceChangePercent, true),
       high24h: parseFloatSafe(ticker.high, true),
       low24h: parseFloatSafe(ticker.low, true),
-      markPrice: null, // EdgeX ticker doesn't directly provide a 'markPrice'. Using index/oracle as alternatives.
+      markPrice: null, 
       indexPrice: parseFloatSafe(ticker.indexPrice, true),
       oraclePrice: parseFloatSafe(ticker.oraclePrice, true),
       exchange: 'EdgeX',
