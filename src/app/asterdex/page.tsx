@@ -1,5 +1,5 @@
 
-'use client'; // Required for useState, useEffect
+'use client'; 
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api';
@@ -30,22 +30,20 @@ export default function AsterDexPage() {
           setExchangeData({ assets: result.assets });
           if (result.assets.length > 0 && result.assets[0]?.id) {
             setSelectedSymbolForOrderBook(result.assets[0].id);
-          } else if (result.assets.length === 0 && !isLoadingPageData) {
-            // console.warn("AsterDex initial data: Assets array is empty.");
           }
         } else {
           throw new Error("Failed to process AsterDex exchange data.");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading initial AsterDex page data:", error);
-        setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] }); // Fallback to empty data
+        setPageError(error.message || "Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
+        setExchangeData({ assets: [] }); 
       } finally {
         setIsLoadingPageData(false);
       }
     }
     loadData();
-  }, []); // Removed isLoadingPageData from dependency array
+  }, []); 
 
   useEffect(() => {
     if (pageError || !selectedSymbolForOrderBook) return;
@@ -72,7 +70,7 @@ export default function AsterDexPage() {
 
   if (isLoadingPageData && !pageError) {
     return (
-      <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
+      <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <CandlestickChart className="h-8 w-8 text-primary" />
@@ -89,7 +87,7 @@ export default function AsterDexPage() {
 
   if (pageError) {
     return (
-      <div className="container mx-auto px-4 md:px-6 py-8">
+      <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <CandlestickChart className="h-8 w-8 text-primary" />
@@ -109,7 +107,7 @@ export default function AsterDexPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
+    <div className="space-y-8">
       <header className="pb-4 mb-6 border-b">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
           <CandlestickChart className="h-8 w-8 text-primary" />
@@ -139,6 +137,7 @@ export default function AsterDexPage() {
       </section>
       
       <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">Asset Details</h2>
         <AssetDataTable 
           initialAssets={exchangeData?.assets ?? []} 
           exchangeName="Aster" 

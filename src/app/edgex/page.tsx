@@ -1,5 +1,5 @@
 
-'use client'; // Required for useState, useEffect
+'use client'; 
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { getEdgeXProcessedData, fetchEdgeXLongShortRatio, fetchEdgeXOrderBook } from '@/lib/edgex-api';
@@ -33,26 +33,23 @@ export default function EdgeXPage() {
           setExchangeData({ assets: processedData.assets });
           if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
             setSelectedContractForOrderBook(processedData.assets[0].id);
-          } else if (processedData.assets.length === 0 && !isLoadingPageData) {
-             // If assets are empty after loading, it might indicate a partial data fetch issue upstream
-            // console.warn("EdgeX initial data: Assets array is empty.");
           }
         } else {
           throw new Error("Failed to process EdgeX exchange data.");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading initial EdgeX page data:", error);
-        setPageError("Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] }); // Fallback to empty data
+        setPageError(error.message || "Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
+        setExchangeData({ assets: [] }); 
       } finally {
         setIsLoadingPageData(false);
       }
     }
     loadInitialData();
-  }, []); // Removed isLoadingPageData from dependency array to prevent re-fetch loops on error
+  }, []); 
 
   useEffect(() => {
-    if (pageError) return; // Don't fetch subsequent data if initial load failed
+    if (pageError) return; 
 
     async function loadRatioData() {
       setIsLoadingRatio(true);
@@ -60,7 +57,7 @@ export default function EdgeXPage() {
         const ratioDataResult = await fetchEdgeXLongShortRatio(selectedRangeForRatio);
         setLongShortRatio(ratioDataResult);
       } catch (error) {
-        console.error(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
+        console.warn(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
         setLongShortRatio(null);
       } finally {
         setIsLoadingRatio(false);
@@ -79,7 +76,7 @@ export default function EdgeXPage() {
         const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20);
         setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
       } catch (error) {
-        console.error(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
+        console.warn(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
         setOrderBook(null);
       } finally {
         setIsLoadingOrderBook(false);
@@ -98,7 +95,7 @@ export default function EdgeXPage() {
 
   if (isLoadingPageData && !pageError) {
     return (
-      <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
+      <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-primary" />
@@ -115,7 +112,7 @@ export default function EdgeXPage() {
 
   if (pageError) {
     return (
-      <div className="container mx-auto px-4 md:px-6 py-8">
+      <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-primary" />
@@ -135,7 +132,7 @@ export default function EdgeXPage() {
   }
   
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
+    <div className="space-y-8">
       <header className="pb-4 mb-6 border-b">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-primary" />
@@ -148,7 +145,7 @@ export default function EdgeXPage() {
         <LongShortRatioDisplay
           ratioData={aggregatedRatioItem}
           exchangeName="EdgeX"
-          availableRanges={longShortRatio?.allRangeList || ['30m', '1h', '4h', '12h', '24h']} // Provide default if list is null
+          availableRanges={longShortRatio?.allRangeList || ['30m', '1h', '4h', '12h', '24h']}
           selectedRange={selectedRangeForRatio}
           onRangeChange={setSelectedRangeForRatio}
           isLoading={isLoadingRatio}
@@ -168,6 +165,7 @@ export default function EdgeXPage() {
       </section>
 
       <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">Asset Details</h2>
         <AssetDataTable 
           initialAssets={exchangeData?.assets ?? []} 
           exchangeName="EdgeX" 

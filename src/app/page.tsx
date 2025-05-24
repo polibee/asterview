@@ -4,7 +4,7 @@ import { getEdgeXProcessedData } from '@/lib/edgex-api';
 import type { ExchangeData } from '@/types';
 import { ExchangeComparisonSummary } from '@/components/exchange-comparison-summary';
 import { AssetDataTable } from '@/components/asset-data-table';
-import { Waves } from 'lucide-react';
+import { LayoutDashboard } from 'lucide-react'; // Keep LayoutDashboard for this page's header
 
 export default async function HomePage() {
   // Fetch data in parallel
@@ -29,7 +29,7 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="container mx-auto px-4 md:px-6 py-8 space-y-10">
+    <div className="space-y-10">
        <header className="pb-2 mb-6 border-b">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
           <LayoutDashboard className="h-8 w-8 text-primary" />
@@ -44,6 +44,7 @@ export default async function HomePage() {
       />
 
       <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">AsterDex Assets</h2>
         <AssetDataTable 
           initialAssets={asterExchangeData?.assets ?? null} 
           exchangeName="Aster" 
@@ -51,6 +52,7 @@ export default async function HomePage() {
       </section>
 
       <section>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4">EdgeX Assets</h2>
         <AssetDataTable 
           initialAssets={edgeXExchangeData?.assets ?? null} 
           exchangeName="EdgeX" 
@@ -64,6 +66,3 @@ export default async function HomePage() {
     </div>
   );
 }
-
-// Helper icon for the header, if not already imported by layout
-import { LayoutDashboard } from 'lucide-react';

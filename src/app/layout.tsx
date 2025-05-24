@@ -3,20 +3,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarTrigger,
-  SidebarInset,
-  SidebarRail,
-} from '@/components/ui/sidebar';
-import Link from 'next/link';
-import { LayoutDashboard, CandlestickChart, BarChart3, Waves } from 'lucide-react';
+import { HeaderNav } from '@/components/layout/header-nav';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -40,63 +27,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
-        <SidebarProvider defaultOpen> {/* SidebarProvider now has group/sidebar-wrapper */}
-          <Sidebar collapsible="icon" side="left"> {/* Ensure collapsible="icon" and it's a peer */}
-            <SidebarHeader>
-              <Link href="/" className="flex items-center gap-2 px-2 py-1 group">
-                <Waves className="h-7 w-7 text-sidebar-primary" />
-                {/* Text span targets parent data-sidebar="sidebar" for hiding */}
-                <span className="text-lg font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                  EdgeView
-                </span>
-              </Link>
-            </SidebarHeader>
-            <SidebarContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Overview">
-                    <Link href="/">
-                      <LayoutDashboard />
-                      <span className="group-data-[collapsible=icon]:hidden">Overview</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="AsterDex">
-                    <Link href="/asterdex">
-                      <CandlestickChart />
-                      <span className="group-data-[collapsible=icon]:hidden">AsterDex</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="EdgeX">
-                    <Link href="/edgex">
-                      <BarChart3 />
-                      <span className="group-data-[collapsible=icon]:hidden">EdgeX</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarContent>
-          </Sidebar>
-          <SidebarRail /> {/* This should allow collapsing */}
-          <SidebarInset> {/* This will now correctly react to the sidebar-wrapper's state and peer's data-collapsible */}
-            <div className="flex flex-col min-h-screen bg-muted/30">
-              <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">
-                <SidebarTrigger />
-                <Link href="/" className="flex items-center gap-2">
-                  <Waves className="h-6 w-6 text-primary" />
-                  <h1 className="text-lg font-semibold">EdgeView</h1>
-                </Link>
-              </header>
-              <main className="flex-grow">
-                {children}
-              </main>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}>
+        <HeaderNav />
+        <main className="flex-grow container mx-auto px-4 md:px-6 py-8 pt-[calc(3.5rem+2rem)] sm:pt-[calc(3.5rem+2.5rem)]"> {/* Adjusted padding-top */}
+          {children}
+        </main>
         <Toaster />
       </body>
     </html>
