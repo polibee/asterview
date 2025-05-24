@@ -14,8 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare } from 'lucide-react';
-// Removed ScrollArea import as we'll rely on Table's internal scroll
+import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, fromUnixTime } from 'date-fns';
 
@@ -29,7 +28,7 @@ type SortKey = keyof ExchangeAssetDetail | '';
 type SortOrder = 'asc' | 'desc';
 
 const parseFloatSafe = (value: string | number | undefined | null, defaultValue = 0): number => {
-    if (value === undefined || value === null) return defaultValue;
+    if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
     const num = parseFloat(String(value));
     return isNaN(num) ? defaultValue : num;
 };
@@ -85,16 +84,16 @@ const formatLargeNumber = (num: number | undefined | null) => {
 
 const formatPercentage = (percentage: number | undefined | null) => {
   if (percentage === undefined || percentage === null || isNaN(percentage)) return 'N/A';
-  return `${percentage.toFixed(2)}%`;
+  return `${parseFloatSafe(percentage).toFixed(2)}%`;
 };
 
 const formatFundingRate = (rate: number | null | undefined) => {
   if (rate === null || rate === undefined || isNaN(rate)) return 'N/A';
-  return `${(rate * 100).toFixed(4)}%`;
+  return `${(parseFloatSafe(rate) * 100).toFixed(4)}%`;
 };
 
 const formatUnixTimestamp = (timestamp: number | null | undefined) => {
-  if (timestamp === null || timestamp === undefined || isNaN(timestamp)) return 'N/A';
+  if (timestamp === null || timestamp === undefined || isNaN(timestamp) || timestamp === 0) return 'N/A';
   const date = (String(timestamp).length === 10) ? fromUnixTime(timestamp) : new Date(timestamp);
   if (isNaN(date.getTime())) return 'Invalid Date';
   return format(date, 'MMM d, HH:mm');
@@ -232,13 +231,13 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
 
   const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string, numeric?: boolean, sticky?: 'left' | 'right', stickyOffset?: string }[] = [
     { key: '', label: '#', className: "w-[40px] text-center", sticky: 'left', stickyOffset: '0px' },
-    { key: 'symbol', label: 'Symbol', className: "w-[150px]", sticky: 'left', stickyOffset: '40px' },
+    { key: 'symbol', label: 'Symbol', className: "w-[150px]", sticky: 'left', stickyOffset: '40px' }, // Adjusted offset based on '#' width
     { key: 'price', label: 'Price', numeric: true },
     { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, className: "w-[120px]" },
     { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, className: "w-[130px]" },
     { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, className: "w-[130px]" },
     { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, className: "w-[150px]" },
-    { key: 'openInterest', label: 'Open Interest', numeric: true, className: "w-[150px]" },
+    { key: 'openInterest', label: 'Open Interest', icon: BookOpen, numeric: true, className: "w-[150px]" },
     { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, className: "w-[130px]" },
     { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, className: "w-[130px]" },
     { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "w-[130px]" },
@@ -281,21 +280,21 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-[600px]"> {/* Added fixed height for vertical scroll */}
-          <Table className="min-w-full"> {/* Table itself handles overflow due to its wrapper */}
-            <TableHeader className="sticky top-0 bg-card z-20"> {/* Sticky header */}
+      <CardContent className="p-0 h-[600px] overflow-auto"> {/* CardContent handles vertical scroll */}
+          <Table className="min-w-full"> {/* Table itself provides horizontal scroll via its internal wrapper */}
+            <TableHeader className="sticky top-0 bg-card z-20 shadow-sm"> {/* Sticky header */}
               <TableRow>
                 {columns.map(col => (
                   <TableHead
                     key={col.key || col.label}
                     className={cn(
-                        "py-2 px-3 text-xs sm:text-sm bg-card", // Ensure background for sticky
+                        "py-2 px-3 text-xs sm:text-sm bg-card", 
                         col.className || '', 
                         col.key ? 'cursor-pointer hover:bg-muted/50' : '', 
                         col.numeric ? 'text-right' : 'text-left',
-                        col.sticky === 'left' ? 'sticky z-10' : '' // Apply sticky class
+                        col.sticky === 'left' ? 'sticky z-10' : '' 
                     )}
-                    style={col.sticky === 'left' ? { left: col.stickyOffset } : {}}
+                    style={col.sticky === 'left' ? { left: col.stickyOffset, backgroundColor: 'hsl(var(--card))' } : {backgroundColor: 'hsl(var(--card))'}}
                     onClick={() => col.key && handleSort(col.key)}
                   >
                     <div className={`flex items-center ${col.numeric ? 'justify-end' : 'justify-start'}`}>
@@ -314,14 +313,14 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     <TableCell
                       key={`${item.id}-${col.key || col.label}`}
                       className={cn(
-                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap bg-card group-hover:bg-muted/20", // Ensure background for sticky, add whitespace-nowrap
+                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap group-hover:bg-muted/20", 
                         col.className,
                         col.numeric ? 'text-right font-mono' : 'text-left',
                         col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) < 0 ? 'text-red-500' : parseFloatSafe(item.priceChangePercent24h) > 0 ? 'text-green-500' : ''),
                         col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) < 0 ? 'text-red-500' : parseFloatSafe(item.fundingRate) > 0 ? 'text-green-500' : ''),
-                        col.sticky === 'left' ? 'sticky z-10' : '' // Apply sticky class
+                        col.sticky === 'left' ? 'sticky z-10' : ''
                       )}
-                      style={col.sticky === 'left' ? { left: col.stickyOffset } : {}}
+                       style={col.sticky === 'left' ? { left: col.stickyOffset, backgroundColor: 'hsl(var(--card))' } : {}}
                     >
                       {col.key === '' ? index + 1 :
                        col.key === 'symbol' ? (
@@ -364,4 +363,3 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     </Card>
   );
 }
-

@@ -41,11 +41,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
-        <SidebarProvider defaultOpen>
-          <Sidebar collapsible="icon"> {/* Ensure collapsible="icon" for desktop icon mode */}
+        <SidebarProvider defaultOpen> {/* SidebarProvider now has group/sidebar-wrapper */}
+          <Sidebar collapsible="icon" side="left"> {/* Ensure collapsible="icon" and it's a peer */}
             <SidebarHeader>
               <Link href="/" className="flex items-center gap-2 px-2 py-1 group">
                 <Waves className="h-7 w-7 text-sidebar-primary" />
+                {/* Text span targets parent data-sidebar="sidebar" for hiding */}
                 <span className="text-lg font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
                   EdgeView
                 </span>
@@ -80,8 +81,8 @@ export default function RootLayout({
               </SidebarMenu>
             </SidebarContent>
           </Sidebar>
-          <SidebarRail />
-          <SidebarInset>
+          <SidebarRail /> {/* This should allow collapsing */}
+          <SidebarInset> {/* This will now correctly react to the sidebar-wrapper's state and peer's data-collapsible */}
             <div className="flex flex-col min-h-screen bg-muted/30">
               <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">
                 <SidebarTrigger />
