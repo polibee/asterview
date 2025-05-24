@@ -48,7 +48,7 @@ const processOrderBookData = (
     return { price, quantity, total: cumulativeQty };
   });
 
-  return isBid ? processed : processed.reverse(); // Asks are typically displayed with lowest price at bottom
+  return isBid ? processed : processed.sort((a, b) => a.price - b.price); // Asks: lowest price at top of visual list
 };
 
 
@@ -63,41 +63,73 @@ export function OrderBookDisplay({
 }: OrderBookDisplayProps) {
 
   const bids = useMemo(() => processOrderBookData(bidsRaw, true, exchangeName), [bidsRaw, exchangeName]);
+  // For asks, ensure they are sorted ascending by price for typical display (lowest ask at the "bottom" of its list, visually closer to bids)
   const asks = useMemo(() => processOrderBookData(asksRaw, false, exchangeName), [asksRaw, exchangeName]);
+
 
   const maxCumulative = Math.max(
     bids[bids.length - 1]?.total || 0,
-    asks[0]?.total || 0 // asks are reversed, so first element has max total
+    asks[asks.length - 1]?.total || 0 
   );
   
   const formatPrice = (price: number) => {
-    // Basic price formatting, can be enhanced
     return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 });
   }
 
   const renderOrderBookRows = (orders: UnifiedOrderBookEntry[], isBid: boolean) => {
-    return orders.map((order, index) => (
-      <TableRow key={`${order.price}-${index}`} className="relative hover:bg-muted/20">
+    // For asks, we want to display them traditionally: lowest ask price at the "bottom" of the asks list (top of the table segment)
+    // and highest ask price at the "top" of the asks list (bottom of the table segment).
+    // The `processOrderBookData` already sorts asks by price ascending.
+    // If displaying asks in a list that grows upwards from the spread, iterate normally.
+    // If displaying asks in a list that grows downwards (like bids), reverse asks.
+    // Current setup for asks: lowest price at top (index 0), highest at bottom.
+    const displayOrders = isBid ? orders : [...orders].reverse(); // Reverse asks for typical top-down display starting with lowest ask
+
+    return displayOrders.map((order, index) => (
+      <TableRow key={`${order.price}-${index}-${isBid}`} className="relative hover:bg-muted/20 h-7">
         {isBid ? (
           <>
-            <TableCell className="text-green-500 text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3">{formatPrice(order.price)}</TableCell>
-            <TableCell className="text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3">{order.quantity.toFixed(4)}</TableCell>
-            <TableCell className="text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3">{order.total?.toFixed(4)}</TableCell>
+            <TableCell className="text-green-500 text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3 relative z-[1]">
+              {formatPrice(order.price)}
+            </TableCell>
+            <TableCell className="text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3 relative z-[1]">
+              {order.quantity.toFixed(4)}
+            </TableCell>
+            <TableCell className="text-xs md:text-sm py-1 px-2 text-right font-mono w-1/3 relative z-[1]">
+              {order.total?.toFixed(4)}
+               {/* Bar for Bids (right-aligned) - now child of last cell for bids */}
+              <div
+                className="absolute top-0 right-0 h-full bg-opacity-20 transition-all duration-100 pointer-events-none"
+                style={{
+                  width: `${((order.total || 0) / maxCumulative) * 100}%`,
+                  backgroundColor: 'hsl(var(--chart-1))', // Using chart-1 for bids
+                  zIndex: 0, 
+                }}
+              />
+            </TableCell>
           </>
         ) : (
           <>
-            <TableCell className="text-red-500 text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3">{formatPrice(order.price)}</TableCell>
-            <TableCell className="text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3">{order.quantity.toFixed(4)}</TableCell>
-            <TableCell className="text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3">{order.total?.toFixed(4)}</TableCell>
+            <TableCell className="text-red-500 text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3 relative z-[1]">
+              {formatPrice(order.price)}
+            </TableCell>
+            <TableCell className="text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3 relative z-[1]">
+              {order.quantity.toFixed(4)}
+            </TableCell>
+            <TableCell className="text-xs md:text-sm py-1 px-2 text-left font-mono w-1/3 relative z-[1]">
+              {order.total?.toFixed(4)}
+              {/* Bar for Asks (left-aligned) - now child of last cell for asks */}
+              <div
+                className="absolute top-0 left-0 h-full bg-opacity-20 transition-all duration-100 pointer-events-none"
+                style={{
+                  width: `${((order.total || 0) / maxCumulative) * 100}%`,
+                  backgroundColor: 'hsl(var(--chart-2))', // Using chart-2 for asks
+                  zIndex: 0, 
+                }}
+              />
+            </TableCell>
           </>
         )}
-        <div
-          className={`absolute top-0 ${isBid ? 'right-0' : 'left-0'} h-full bg-opacity-10 transition-all duration-300`}
-          style={{
-            width: `${((order.total || 0) / maxCumulative) * 100}%`,
-            backgroundColor: isBid ? 'hsl(var(--chart-1), 0.2)' : 'hsl(var(--chart-2), 0.2)',
-          }}
-        />
       </TableRow>
     ));
   };
@@ -149,7 +181,7 @@ export function OrderBookDisplay({
             <div className="md:border-r md:pr-0.5">
               <Table className="w-full">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="h-9">
                     <TableHead className="text-right py-1 px-2 text-xs md:text-sm w-1/3">Price (USD)</TableHead>
                     <TableHead className="text-right py-1 px-2 text-xs md:text-sm w-1/3">Quantity</TableHead>
                     <TableHead className="text-right py-1 px-2 text-xs md:text-sm w-1/3">Total</TableHead>
@@ -167,7 +199,7 @@ export function OrderBookDisplay({
             <div className="mt-4 md:mt-0 md:border-l md:pl-0.5">
               <Table className="w-full">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="h-9">
                     <TableHead className="py-1 px-2 text-xs md:text-sm w-1/3">Price (USD)</TableHead>
                     <TableHead className="py-1 px-2 text-xs md:text-sm w-1/3">Quantity</TableHead>
                     <TableHead className="py-1 px-2 text-xs md:text-sm w-1/3">Total</TableHead>
@@ -176,6 +208,7 @@ export function OrderBookDisplay({
               </Table>
               <ScrollArea className="h-[300px] md:h-[400px]">
                 <Table className="w-full">
+                  {/* For asks, reverse the array for typical display (lowest ask price at top) */}
                   <TableBody>{renderOrderBookRows(asks, false)}</TableBody>
                 </Table>
               </ScrollArea>
@@ -186,3 +219,4 @@ export function OrderBookDisplay({
     </Card>
   );
 }
+
