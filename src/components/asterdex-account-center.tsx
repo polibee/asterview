@@ -1,3 +1,4 @@
+
 // src/components/asterdex-account-center.tsx
 'use client';
 
@@ -29,7 +30,7 @@ const parseFloatSafe = (value: string | number | undefined | null, defaultValue:
 
 const formatUsd = (value: number | null, digits = 2) => {
   if (value === null || isNaN(value)) return 'N/A';
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USDT', minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits });
 };
 
 const formatNumber = (value: number | null, digits = 0) => {
@@ -375,3 +376,4 @@ export function AsterdexAccountCenter() {
     </div>
   );
 }
+
