@@ -1,10 +1,11 @@
 'use client';
 
+import * as React from 'react';
 import type { MarketData } from '@/types';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useTheme } from 'next-themes'; // Assuming next-themes is or will be installed for theme awareness. If not, remove this and hardcode colors or pass them.
-import { themes } from 'tailwind.config'; // This is a hypothetical import, adjust if your tailwind config is structured differently or colors are directly in globals.css
+// import { themes } from 'tailwind.config'; // This is a hypothetical import, adjust if your tailwind config is structured differently or colors are directly in globals.css
 
 // Helper to get HSL values from CSS variables
 const getCssVarValue = (varName: string): string => {
