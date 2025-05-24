@@ -29,41 +29,41 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="bg-background border-b text-foreground shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 md:px-6 py-4 flex items-center gap-3">
-          <Waves className="h-8 w-8 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">Exchange Data Comparator</h1>
-        </div>
+    <div className="container mx-auto px-4 md:px-6 py-8 space-y-10">
+       <header className="pb-2 mb-6 border-b">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <LayoutDashboard className="h-8 w-8 text-primary" />
+          Exchanges Overview
+        </h1>
+        <p className="text-muted-foreground mt-1">A comparative glance at AsterDex and EdgeX.</p>
       </header>
 
-      <main className="flex-grow container mx-auto px-4 md:px-6 py-8 space-y-10">
-        <ExchangeComparisonSummary 
-          asterData={asterExchangeData?.metrics ?? null} 
-          edgeXData={edgeXExchangeData?.metrics ?? null} 
+      <ExchangeComparisonSummary 
+        asterData={asterExchangeData?.metrics ?? null} 
+        edgeXData={edgeXExchangeData?.metrics ?? null} 
+      />
+
+      <section>
+        <AssetDataTable 
+          initialAssets={asterExchangeData?.assets ?? null} 
+          exchangeName="Aster" 
         />
+      </section>
 
-        <section>
-          <AssetDataTable 
-            assets={asterExchangeData?.assets ?? null} 
-            exchangeName="AsterDex" 
-          />
-        </section>
+      <section>
+        <AssetDataTable 
+          initialAssets={edgeXExchangeData?.assets ?? null} 
+          exchangeName="EdgeX" 
+        />
+      </section>
 
-        <section>
-          <AssetDataTable 
-            assets={edgeXExchangeData?.assets ?? null} 
-            exchangeName="EdgeX" 
-          />
-        </section>
-      </main>
-
-      <footer className="bg-card border-t border-border text-center py-6 text-sm text-muted-foreground">
-        <div className="container mx-auto px-4">
-          <p>&copy; {new Date().getFullYear()} Exchange Comparator. Data fetched from public APIs.</p>
-          <p>All data is for informational purposes only.</p>
-        </div>
+      <footer className="text-center py-6 text-sm text-muted-foreground mt-10 border-t">
+        <p>&copy; {new Date().getFullYear()} EdgeView Comparator. Data fetched from public APIs.</p>
+        <p>All data is for informational purposes only.</p>
       </footer>
     </div>
   );
 }
+
+// Helper icon for the header, if not already imported by layout
+import { LayoutDashboard } from 'lucide-react';
