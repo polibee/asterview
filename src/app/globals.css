@@ -4,95 +4,97 @@
 
 @layer base {
   :root {
-    --background: 0 0% 97%; /* Off-white */
-    --foreground: 0 0% 17%; /* Dark gray for text */
+    /* New Theme based on "Account Center" image */
+    --background: 220 20% 97%; /* Light grayish blue background */
+    --foreground: 220 10% 20%; /* Dark grayish blue for text */
 
-    --muted: 0 0% 91%; /* Lighter gray for muted elements */
-    --muted-foreground: 0 0% 45%; /* Muted text color */
+    --muted: 220 15% 90%; /* Lighter gray for muted elements */
+    --muted-foreground: 220 10% 45%; /* Muted text color */
 
     --popover: 0 0% 100%; /* White for popovers */
-    --popover-foreground: 0 0% 17%;
+    --popover-foreground: 220 10% 20%;
 
     --card: 0 0% 100%; /* White for cards */
-    --card-foreground: 0 0% 17%;
+    --card-foreground: 220 10% 20%;
 
-    --border: 0 0% 87%; /* Light gray border */
-    --input: 0 0% 93%; /* Light gray for input fields */
+    --border: 220 15% 88%; /* Light gray border, slightly darker than muted */
+    --input: 220 15% 94%; /* Very light gray for input fields */
 
-    --primary: 210 100% 56%; /* Apple-like Blue */
+    --primary: 210 90% 55%; /* A vibrant blue, similar to connect button */
     --primary-foreground: 0 0% 100%; /* White text on primary */
 
-    --secondary: 0 0% 94%; /* Slightly darker off-white for secondary elements */
-    --secondary-foreground: 0 0% 17%;
+    --secondary: 220 10% 85%; /* Slightly darker off-white for secondary elements */
+    --secondary-foreground: 220 10% 20%;
 
-    --accent: 0 0% 90%; /* Light Neutral Gray for accent (e.g. hover states) */
-    --accent-foreground: 0 0% 17%; /* Dark text on accent */
-
-    --destructive: 0 84% 60%;
+    --accent: 220 15% 92%; /* Light Neutral Gray for accent (e.g. hover states on cards/buttons) */
+    --accent-foreground: 210 90% 55%; /* Primary blue for text on accent hover (like nav) */
+    
+    --destructive: 0 72% 51%; /* A clearer red */
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 210 100% 56%; /* Use primary for ring focus */
+    --ring: 210 90% 60%; /* Use primary for ring focus, slightly lighter */
 
-    --chart-1: 210 100% 56%; /* Apple Blue */
-    --chart-2: 0 0% 50%;   /* Mid Gray */
-    --chart-3: 210 80% 70%; /* Lighter Apple Blue */
-    --chart-4: 0 0% 70%;   /* Light Gray */
-    --chart-5: 210 60% 80%; /* Even Lighter/Desaturated Apple Blue */
+    --chart-1: 210 90% 55%; 
+    --chart-2: 0 70% 60%;   /* A contrasting color for charts (e.g. a red/coral) */
+    --chart-3: 210 80% 70%; 
+    --chart-4: 0 0% 70%;   
+    --chart-5: 210 60% 80%; 
 
-    --sidebar-background: 0 0% 94%; /* Distinct light gray for sidebar */
-    --sidebar-foreground: 0 0% 17%;
-    --sidebar-primary: 210 100% 56%;
+    /* Sidebar specific variables not strictly needed with top nav, but kept for components */
+    --sidebar-background: 220 15% 94%; 
+    --sidebar-foreground: 220 10% 20%;
+    --sidebar-primary: 210 90% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 88%; /* Hover for sidebar items */
-    --sidebar-accent-foreground: 0 0% 17%;
-    --sidebar-border: 0 0% 82%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-accent: 220 15% 88%; 
+    --sidebar-accent-foreground: 210 90% 55%;
+    --sidebar-border: 220 15% 82%;
+    --sidebar-ring: 210 90% 55%;
   }
 
   .dark {
-    --background: 0 0% 12%; /* Very dark gray, almost black */
-    --foreground: 0 0% 93%; /* Off-white text */
+    --background: 220 15% 12%; /* Dark grayish blue background */
+    --foreground: 220 10% 93%; /* Light off-white text */
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 220 15% 20%; /* Darker gray for muted elements */
+    --muted-foreground: 220 10% 65%; /* Muted text color */
 
-    --popover: 0 0% 10%; /* Slightly darker than background for popovers */
-    --popover-foreground: 0 0% 93%;
+    --popover: 220 15% 10%; /* Slightly darker than background */
+    --popover-foreground: 220 10% 93%;
 
-    --card: 0 0% 10%; /* Slightly darker than background for cards */
-    --card-foreground: 0 0% 93%;
+    --card: 220 15% 15%; /* Darker cards */
+    --card-foreground: 220 10% 93%;
 
-    --border: 0 0% 22%; /* Dark gray border */
-    --input: 0 0% 20%; /* Dark gray for input fields */
+    --border: 220 15% 25%; /* Dark gray border */
+    --input: 220 15% 22%; /* Dark gray for input fields */
 
-    --primary: 210 100% 56%; /* Apple-like Blue (consistent) */
-    --primary-foreground: 0 0% 100%; /* White text on primary */
+    --primary: 210 90% 60%; /* Vibrant blue, slightly brighter for dark */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 16%; /* Slightly lighter dark gray for secondary elements */
-    --secondary-foreground: 0 0% 93%;
+    --secondary: 220 10% 25%; 
+    --secondary-foreground: 220 10% 93%;
 
-    --accent: 0 0% 28%; /* Darker Neutral Gray for accent (e.g. hover states) */
-    --accent-foreground: 0 0% 93%; /* Light text on accent */
+    --accent: 220 15% 28%; /* Darker Neutral Gray for accent hover */
+    --accent-foreground: 210 90% 60%; /* Primary blue for text on accent */
     
-    --destructive: 0 70% 50%;
+    --destructive: 0 65% 55%; /* A clearer red for dark mode */
     --destructive-foreground: 0 0% 100%;
 
-    --ring: 210 100% 56%;
+    --ring: 210 90% 65%;
 
-    --chart-1: 210 100% 60%; /* Apple Blue (brighter for dark mode) */
-    --chart-2: 0 0% 70%;   /* Light Gray */
-    --chart-3: 210 80% 75%; /* Lighter Apple Blue */
-    --chart-4: 0 0% 50%;   /* Mid Gray */
-    --chart-5: 210 60% 85%; /* Even Lighter/Desaturated Apple Blue */
+    --chart-1: 210 90% 60%; 
+    --chart-2: 0 70% 65%;   
+    --chart-3: 210 80% 75%; 
+    --chart-4: 0 0% 50%;   
+    --chart-5: 210 60% 85%; 
 
-    --sidebar-background: 0 0% 10%; /* Distinct dark gray for sidebar */
-    --sidebar-foreground: 0 0% 93%;
-    --sidebar-primary: 210 100% 56%;
+    --sidebar-background: 220 15% 10%; 
+    --sidebar-foreground: 220 10% 93%;
+    --sidebar-primary: 210 90% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 24%; /* Hover for sidebar items */
-    --sidebar-accent-foreground: 0 0% 93%;
-    --sidebar-border: 0 0% 28%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-accent: 220 15% 24%; 
+    --sidebar-accent-foreground: 210 90% 60%;
+    --sidebar-border: 220 15% 28%;
+    --sidebar-ring: 210 90% 60%;
   }
 }
 
@@ -102,5 +104,6 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1; /* More OpenType features for Geist */
   }
 }

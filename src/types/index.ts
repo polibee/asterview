@@ -96,6 +96,101 @@ export interface AsterOrderBookData {
   asks: AsterOrderBookEntry[];
 }
 
+// --- Aster User API Types ---
+export interface AsterAccountBalanceV2 {
+  accountAlias: string;
+  asset: string;
+  balance: string;
+  crossWalletBalance: string;
+  crossUnPnl: string;
+  availableBalance: string;
+  maxWithdrawAmount: string;
+  marginAvailable: boolean;
+  updateTime: number;
+}
+
+export interface AsterPositionV2 {
+  symbol: string;
+  initialMargin: string;
+  maintMargin: string;
+  unrealizedProfit: string;
+  positionInitialMargin: string;
+  openOrderInitialMargin: string;
+  leverage: string;
+  isolated: boolean;
+  entryPrice: string;
+  maxNotional: string;
+  positionSide: 'BOTH' | 'LONG' | 'SHORT';
+  positionAmt: string;
+  updateTime: number;
+}
+
+export interface AsterAccountInfoV2Asset {
+  asset: string;
+  walletBalance: string;
+  unrealizedProfit: string;
+  marginBalance: string;
+  maintMargin: string;
+  initialMargin: string;
+  positionInitialMargin: string;
+  openOrderInitialMargin: string;
+  crossWalletBalance: string;
+  crossUnPnl: string;
+  availableBalance: string;
+  maxWithdrawAmount: string;
+  marginAvailable: boolean;
+  updateTime: number;
+}
+
+
+export interface AsterAccountInfoV2 {
+  feeTier: number;
+  canTrade: boolean;
+  canDeposit: boolean;
+  canWithdraw: boolean;
+  updateTime: number;
+  totalInitialMargin: string;
+  totalMaintMargin: string;
+  totalWalletBalance: string;
+  totalUnrealizedProfit: string;
+  totalMarginBalance: string;
+  totalPositionInitialMargin: string;
+  totalOpenOrderInitialMargin: string;
+  totalCrossWalletBalance: string;
+  totalCrossUnPnl: string;
+  availableBalance: string;
+  maxWithdrawAmount: string;
+  assets: AsterAccountInfoV2Asset[];
+  positions: AsterPositionV2[]; 
+}
+
+export interface AsterUserTrade {
+    buyer: boolean;
+    commission: string;
+    commissionAsset: string;
+    id: number;
+    maker: boolean;
+    orderId: number;
+    price: string;
+    qty: string;
+    quoteQty: string;
+    realizedPnl: string;
+    side: 'BUY' | 'SELL';
+    positionSide: 'BOTH' | 'LONG' | 'SHORT';
+    symbol: string;
+    time: number;
+}
+
+export interface AsterCommissionRate {
+  symbol: string;
+  makerCommissionRate: string;
+  takerCommissionRate: string;
+}
+
+export interface AsterListenKey {
+  listenKey: string;
+}
+
 
 // --- EdgeX API Types ---
 export interface EdgeXContract {
@@ -109,11 +204,22 @@ export interface EdgeXContract {
   maxOrderSize: string;
   enableTrade: boolean;
   enableDisplay: boolean;
-  starkExSyntheticAssetId?: string; // used for placeholder icon generation
+  starkExSyntheticAssetId?: string;
 }
 
+export interface EdgeXCoin { // Added EdgeXCoin
+  coinId: string;
+  coinName: string;
+  iconUrl: string;
+  stepSize: string;
+  showStepSize: string;
+  starkExAssetId?: string | null;
+  starkExResolution?: string | null;
+}
+
+
 export interface EdgeXMetaData {
-  coinList: { coinId: string, coinName: string, iconUrl: string }[];
+  coinList: EdgeXCoin[];
   contractList: EdgeXContract[];
 }
 
@@ -140,15 +246,15 @@ export interface EdgeXTicker {
 
 export interface EdgeXFundingRateItem {
     contractId: string;
-    fundingTime: string; // Timestamp string for when this rate applies/settled
-    fundingTimestamp: string; // Timestamp string of calculation
+    fundingTime: string; 
+    fundingTimestamp: string; 
     oraclePrice: string;
     indexPrice: string;
-    fundingRate: string; // The actual funding rate
+    fundingRate: string; 
     isSettlement: boolean;
-    forecastFundingRate?: string; // Optional as per some responses
-    previousFundingRate?: string; // Optional
-    previousFundingTimestamp?: string; // Optional
+    forecastFundingRate?: string; 
+    previousFundingRate?: string; 
+    previousFundingTimestamp?: string; 
     premiumIndex: string;
     avgPremiumIndex: string;
     premiumIndexTimestamp: string;
@@ -156,10 +262,10 @@ export interface EdgeXFundingRateItem {
     impactAskPrice: string;
     impactBidPrice: string;
     interestRate: string;
-    predictedFundingRate?: string; // Optional
+    predictedFundingRate?: string; 
     fundingRateIntervalMin: string;
     starkExFundingIndex: string;
-    nextFundingTime?: string; // Added for consistency if available, but EdgeXTicker also has it
+    nextFundingTime?: string; 
 }
 
 export interface EdgeXLatestFundingRateResponse {
@@ -175,8 +281,8 @@ export interface EdgeXLatestFundingRateResponse {
 
 export interface EdgeXLongShortRatioItem {
   range: string;
-  contractId: string; // Can be "_total_" or a specific contract ID
-  exchange: string; // e.g., "_total_"
+  contractId: string; 
+  exchange: string; 
   buyRatio: string;
   sellRatio: string;
   buyVolUsd: string;
@@ -187,7 +293,7 @@ export interface EdgeXLongShortRatioItem {
 
 export interface EdgeXLongShortRatioData {
   exchangeLongShortRatioList: EdgeXLongShortRatioItem[];
-  allRangeList: string[]; // e.g., ["30m", "1h", "4h"]
+  allRangeList: string[]; 
 }
 
 export type EdgeXOrderBookEntryRaw = { price: string; size: string };
@@ -205,12 +311,12 @@ export interface EdgeXOrderBookData {
 
 // --- Unified/Comparison Types ---
 export interface ExchangeAssetDetail {
-  id: string; // Aster: symbol, EdgeX: contractId
-  symbol: string; // Common trading symbol, e.g. BTC/USDT
+  id: string; 
+  symbol: string; 
   price: number;
-  dailyVolume: number; // In quote currency
-  baseAssetVolume24h?: number; // In base currency
-  openInterest: number; // In quote currency
+  dailyVolume: number; 
+  baseAssetVolume24h?: number; 
+  openInterest: number; 
   dailyTrades: number;
   fundingRate: number | null;
   nextFundingTime: number | null;
@@ -219,14 +325,14 @@ export interface ExchangeAssetDetail {
   low24h: number | null;
   markPrice: number | null;
   indexPrice: number | null;
-  oraclePrice?: number | null; // Optional, mainly for EdgeX
+  oraclePrice?: number | null; 
   exchange: 'Aster' | 'EdgeX';
-  iconUrl?: string; // Optional icon
+  iconUrl?: string; 
 }
 
 export interface ExchangeAggregatedMetrics {
-  totalDailyVolume: number; // In quote currency
-  totalOpenInterest: number; // In quote currency
+  totalDailyVolume: number; 
+  totalOpenInterest: number; 
   totalDailyTrades: number;
 }
 
@@ -236,10 +342,35 @@ export interface ExchangeData {
   assets: ExchangeAssetDetail[];
 }
 
-// Unified Order Book Entry for display
 export type UnifiedOrderBookEntry = {
   price: number;
   quantity: number;
-  total?: number; // Optional cumulative quantity
+  total?: number; 
 };
+
+// Account Center Data Types
+export interface AsterAccountSummaryData {
+  portfolioValue: number | null;
+  totalUnrealizedPNL: number | null;
+  totalRealizedPNL: number | null; // Needs calculation over a period
+  totalTrades: number | null; // Long/Short breakdown might require more logic
+  totalTradesLong?: number;
+  totalTradesShort?: number;
+  totalVolume: number | null; // Long/Short breakdown
+  totalVolumeLong?: number;
+  totalVolumeShort?: number;
+  totalFeesPaid: number | null; // Needs calculation
+  commissionRateTaker?: string | null;
+  commissionRateMaker?: string | null;
+  commissionSymbol?: string | null;
+  todayVolumeAuBoost: number | null;
+  auTraderBoost: string | null; // e.g. "+1x"
+  rhPointsTotal: number | null;
+  // Raw data for further processing if needed
+  balances?: AsterAccountBalanceV2[];
+  accountInfo?: AsterAccountInfoV2;
+  positions?: AsterPositionV2[];
+  userTrades?: AsterUserTrade[]; // Could be a sample for recent trades
+  webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
+}
 
