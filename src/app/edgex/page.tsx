@@ -3,44 +3,57 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { getEdgeXProcessedData, fetchEdgeXLongShortRatio, fetchEdgeXOrderBook } from '@/lib/edgex-api';
-import type { ExchangeAssetDetail, EdgeXLongShortRatioData, EdgeXLongShortRatioItem, EdgeXOrderBookData, EdgeXOrderBookEntryRaw } from '@/types';
+import type { ExchangeAssetDetail, EdgeXLongShortRatioData, EdgeXOrderBookData, EdgeXOrderBookEntryRaw } from '@/types';
 import { AssetDataTable } from '@/components/asset-data-table';
 import { OrderBookDisplay } from '@/components/order-book-display';
 import { LongShortRatioDisplay } from '@/components/long-short-ratio-display';
-import { BarChart3, Info } from 'lucide-react';
+import { BarChart3, AlertTriangle, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function EdgeXPage() {
   const [exchangeData, setExchangeData] = useState<{ assets: ExchangeAssetDetail[] } | null>(null);
   const [longShortRatio, setLongShortRatio] = useState<EdgeXLongShortRatioData | null>(null);
   const [selectedRangeForRatio, setSelectedRangeForRatio] = useState<string>('1h');
-  const [orderBook, setOrderBook] = useState<EdgeXOrderBookData | null>(null); // EdgeX API returns an array, but we'll take the first.
+  const [orderBook, setOrderBook] = useState<EdgeXOrderBookData | null>(null);
   const [selectedContractForOrderBook, setSelectedContractForOrderBook] = useState<string | null>(null);
   
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
   const [isLoadingRatio, setIsLoadingRatio] = useState(false);
   const [isLoadingOrderBook, setIsLoadingOrderBook] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadInitialData() {
       setIsLoadingPageData(true);
+      setPageError(null);
       try {
         const processedData = await getEdgeXProcessedData();
-        setExchangeData({ assets: processedData.assets });
-        if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
-          setSelectedContractForOrderBook(processedData.assets[0].id); // Default to top asset
+        if (processedData && processedData.assets) {
+          setExchangeData({ assets: processedData.assets });
+          if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
+            setSelectedContractForOrderBook(processedData.assets[0].id);
+          } else if (processedData.assets.length === 0 && !isLoadingPageData) {
+             // If assets are empty after loading, it might indicate a partial data fetch issue upstream
+            // console.warn("EdgeX initial data: Assets array is empty.");
+          }
+        } else {
+          throw new Error("Failed to process EdgeX exchange data.");
         }
       } catch (error) {
         console.error("Error loading initial EdgeX page data:", error);
+        setPageError("Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
         setExchangeData({ assets: [] }); // Fallback to empty data
       } finally {
         setIsLoadingPageData(false);
       }
     }
     loadInitialData();
-  }, []);
+  }, []); // Removed isLoadingPageData from dependency array to prevent re-fetch loops on error
 
   useEffect(() => {
+    if (pageError) return; // Don't fetch subsequent data if initial load failed
+
     async function loadRatioData() {
       setIsLoadingRatio(true);
       try {
@@ -48,35 +61,34 @@ export default function EdgeXPage() {
         setLongShortRatio(ratioDataResult);
       } catch (error) {
         console.error(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
-        setLongShortRatio(null); // Fallback
+        setLongShortRatio(null);
       } finally {
         setIsLoadingRatio(false);
       }
     }
     loadRatioData();
-  }, [selectedRangeForRatio]);
+  }, [selectedRangeForRatio, pageError]);
 
   useEffect(() => {
-    if (selectedContractForOrderBook) {
-      async function loadOrderBookData() {
-        setIsLoadingOrderBook(true);
-        setOrderBook(null); // Clear previous
-        try {
-          const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20); // Level 20
-          setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
-        } catch (error) {
-          console.error(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
-          setOrderBook(null); // Fallback
-        } finally {
-          setIsLoadingOrderBook(false);
-        }
+    if (pageError || !selectedContractForOrderBook) return;
+
+    async function loadOrderBookData() {
+      setIsLoadingOrderBook(true);
+      setOrderBook(null); 
+      try {
+        const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20);
+        setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
+      } catch (error) {
+        console.error(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
+        setOrderBook(null);
+      } finally {
+        setIsLoadingOrderBook(false);
       }
-      loadOrderBookData();
     }
-  }, [selectedContractForOrderBook]);
+    loadOrderBookData();
+  }, [selectedContractForOrderBook, pageError]);
   
   const aggregatedRatioItem = useMemo(() => {
-    // Find the '_total_' exchange item if available, otherwise use the first one as a fallback
     return longShortRatio?.exchangeLongShortRatioList?.find(item => item.exchange === '_total_') || longShortRatio?.exchangeLongShortRatioList?.[0] || null;
   }, [longShortRatio]);
 
@@ -84,9 +96,8 @@ export default function EdgeXPage() {
     return exchangeData?.assets.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
   }, [exchangeData]);
 
-
-  if (isLoadingPageData && !exchangeData) { // Show skeleton only if no data yet
-     return (
+  if (isLoadingPageData && !pageError) {
+    return (
       <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -95,12 +106,34 @@ export default function EdgeXPage() {
           </h1>
            <p className="text-muted-foreground mt-1">Detailed asset information from EdgeX.</p>
         </header>
-        <Skeleton className="h-24 w-full mb-6" />
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-32 w-full mb-6 rounded-lg" />
+        <Skeleton className="h-64 w-full mb-6 rounded-lg" />
+        <Skeleton className="h-96 w-full rounded-lg" />
       </div>
     );
   }
 
+  if (pageError) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-8">
+        <header className="pb-4 mb-6 border-b">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <BarChart3 className="h-8 w-8 text-primary" />
+            EdgeX Exchange Data
+          </h1>
+        </header>
+        <Card className="shadow-lg rounded-lg border-destructive">
+          <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+            <h2 className="text-xl font-semibold text-destructive mb-2">Error Fetching Data</h2>
+            <p className="text-muted-foreground">{pageError}</p>
+            <p className="text-sm text-muted-foreground mt-2">Please try again later.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
       <header className="pb-4 mb-6 border-b">
@@ -115,7 +148,7 @@ export default function EdgeXPage() {
         <LongShortRatioDisplay
           ratioData={aggregatedRatioItem}
           exchangeName="EdgeX"
-          availableRanges={longShortRatio?.allRangeList || []}
+          availableRanges={longShortRatio?.allRangeList || ['30m', '1h', '4h', '12h', '24h']} // Provide default if list is null
           selectedRange={selectedRangeForRatio}
           onRangeChange={setSelectedRangeForRatio}
           isLoading={isLoadingRatio}
