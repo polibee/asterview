@@ -55,10 +55,10 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
   let minimumFractionDigits = defaultPrecision;
   let maximumFractionDigits = defaultPrecision;
 
-  if (price > 0 && Math.abs(price) < 0.000001) { // Use Math.abs for very small negative numbers too
+  if (price > 0 && Math.abs(price) < 0.000001) { 
     return `$${price.toExponential(2)}`;
   } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 1000) {
-    minimumFractionDigits = Math.min(8, defaultPrecision + 4); // Cap precision
+    minimumFractionDigits = Math.min(8, defaultPrecision + 4); 
     maximumFractionDigits = Math.min(8, defaultPrecision + 4);
   } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 100) {
     minimumFractionDigits = Math.min(6, defaultPrecision + 3);
@@ -70,7 +70,6 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
     minimumFractionDigits = Math.min(4, defaultPrecision + 1);
     maximumFractionDigits = Math.min(4, defaultPrecision + 1);
   }
-
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -195,7 +194,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     return () => {
       ws.close();
     };
-  }, [isClient, exchangeName, internalAssets.length]); // internalAssets.length ensures re-connect if initialAssets changes drastically
+  }, [isClient, exchangeName, internalAssets.length]); 
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -292,90 +291,90 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-[600px] overflow-y-auto"> {/* Vertical scroll on CardContent */}
-          <Table className="table-fixed"> {/* Horizontal scroll handled by Table's inner div */}
-            <TableHeader className="sticky top-0 z-20 shadow-sm">
-              <TableRow>
+      <CardContent className="p-0 h-[600px] overflow-y-auto">
+        <Table className="table-fixed">
+          <TableHeader className="sticky top-0 z-20 shadow-sm">
+            <TableRow>
+              {columns.map((col, colIndex) => (
+                <TableHead
+                  key={col.key || col.label}
+                  className={cn(
+                      "py-2 px-3 text-xs sm:text-sm whitespace-nowrap",
+                      col.className || '',
+                      col.key ? 'cursor-pointer hover:bg-muted/50' : '',
+                      col.numeric ? 'text-right' : 'text-left',
+                      col.sticky === 'left' ? 'sticky z-10' : '',
+                      colIndex === 1 ? 'border-r' : '' 
+                  )}
+                  style={{ 
+                      left: col.sticky === 'left' ? col.stickyOffset : undefined, 
+                      backgroundColor: 'hsl(var(--card))',
+                      minWidth: col.minWidth,
+                  }}
+                  onClick={() => col.key && handleSort(col.key)}
+                >
+                  <div className={`flex items-center ${col.numeric ? 'justify-end' : 'justify-start'}`}>
+                    {col.icon && <col.icon className="mr-1 h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                    {col.label}
+                    {col.key && renderSortIcon(col.key)}
+                  </div>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
+              <TableRow key={item.id} className="hover:bg-muted/20 h-10 group">
                 {columns.map((col, colIndex) => (
-                  <TableHead
-                    key={col.key || col.label}
+                  <TableCell
+                    key={`${item.id}-${col.key || col.label}`}
                     className={cn(
-                        "py-2 px-3 text-xs sm:text-sm whitespace-nowrap",
-                        col.className || '',
-                        col.key ? 'cursor-pointer hover:bg-muted/50' : '',
-                        col.numeric ? 'text-right' : 'text-left',
-                        col.sticky === 'left' ? 'sticky z-10' : '',
-                        colIndex === 1 ? 'border-r' : '' // Add border to the "Symbol" column header
+                      "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap group-hover:bg-muted/20",
+                      col.className,
+                      col.numeric ? 'text-right font-mono' : 'text-left',
+                      col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.priceChangePercent24h) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
+                      col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.fundingRate) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
+                      col.sticky === 'left' ? 'sticky z-10' : '',
+                      colIndex === 1 ? 'border-r' : ''
                     )}
-                    style={{ 
-                        left: col.sticky === 'left' ? col.stickyOffset : undefined, 
-                        backgroundColor: 'hsl(var(--card))', // Explicit background for sticky header
-                        minWidth: col.minWidth,
-                    }}
-                    onClick={() => col.key && handleSort(col.key)}
+                     style={{
+                      left: col.sticky === 'left' ? col.stickyOffset : undefined, 
+                      backgroundColor: 'hsl(var(--card))', 
+                      minWidth: col.minWidth,
+                     }}
                   >
-                    <div className={`flex items-center ${col.numeric ? 'justify-end' : 'justify-start'}`}>
-                      {col.icon && <col.icon className="mr-1 h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                      {col.label}
-                      {col.key && renderSortIcon(col.key)}
-                    </div>
-                  </TableHead>
+                    {col.key === '' ? index + 1 :
+                     col.key === 'symbol' ? (
+                      <div className="flex items-center gap-2">
+                        {item.iconUrl && <Image data-ai-hint={`${item.symbol.replace(/USDT$/, '').replace(/PERP$/, '') || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
+                        <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
+                      </div>
+                     ) :
+                     col.key === 'price' ? formatPrice(item.price) :
+                     col.key === 'priceChangePercent24h' ? formatPercentage(item.priceChangePercent24h) :
+                     col.key === 'high24h' ? formatPrice(item.high24h) :
+                     col.key === 'low24h' ? formatPrice(item.low24h) :
+                     col.key === 'dailyVolume' ? formatLargeNumber(item.dailyVolume) :
+                     col.key === 'openInterest' ? formatLargeNumber(item.openInterest) :
+                     col.key === 'markPrice' ? formatPrice(item.markPrice) :
+                     col.key === 'indexPrice' ? formatPrice(item.indexPrice) :
+                     col.key === 'fundingRate' ? formatFundingRate(item.fundingRate) :
+                     col.key === 'nextFundingTime' ? formatUnixTimestamp(item.nextFundingTime) :
+                     col.key === 'dailyTrades' ? formatLargeNumber(item.dailyTrades) :
+                     (item[col.key as keyof ExchangeAssetDetail] === null || item[col.key as keyof ExchangeAssetDetail] === undefined) ? 'N/A' : String(item[col.key as keyof ExchangeAssetDetail])
+                    }
+                  </TableCell>
                 ))}
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
-                <TableRow key={item.id} className="hover:bg-muted/20 h-10 group">
-                  {columns.map((col, colIndex) => (
-                    <TableCell
-                      key={`${item.id}-${col.key || col.label}`}
-                      className={cn(
-                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap group-hover:bg-muted/20",
-                        col.className,
-                        col.numeric ? 'text-right font-mono' : 'text-left',
-                        col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.priceChangePercent24h) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
-                        col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.fundingRate) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
-                        col.sticky === 'left' ? 'sticky z-10' : '',
-                        colIndex === 1 ? 'border-r' : '' // Add border to the "Symbol" column cells
-                      )}
-                       style={{
-                        left: col.sticky === 'left' ? col.stickyOffset : undefined, 
-                        backgroundColor: 'hsl(var(--card))', // Explicit background for sticky cells
-                        minWidth: col.minWidth,
-                       }}
-                    >
-                      {col.key === '' ? index + 1 :
-                       col.key === 'symbol' ? (
-                        <div className="flex items-center gap-2">
-                          {item.iconUrl && <Image data-ai-hint={`${item.symbol.split('/')[0] || item.symbol.split('USDT')[0] || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
-                          <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
-                        </div>
-                       ) :
-                       col.key === 'price' ? formatPrice(item.price) :
-                       col.key === 'priceChangePercent24h' ? formatPercentage(item.priceChangePercent24h) :
-                       col.key === 'high24h' ? formatPrice(item.high24h) :
-                       col.key === 'low24h' ? formatPrice(item.low24h) :
-                       col.key === 'dailyVolume' ? formatLargeNumber(item.dailyVolume) :
-                       col.key === 'openInterest' ? formatLargeNumber(item.openInterest) :
-                       col.key === 'markPrice' ? formatPrice(item.markPrice) :
-                       col.key === 'indexPrice' ? formatPrice(item.indexPrice) :
-                       col.key === 'fundingRate' ? formatFundingRate(item.fundingRate) :
-                       col.key === 'nextFundingTime' ? formatUnixTimestamp(item.nextFundingTime) :
-                       col.key === 'dailyTrades' ? formatLargeNumber(item.dailyTrades) :
-                       (item[col.key as keyof ExchangeAssetDetail] === null || item[col.key as keyof ExchangeAssetDetail] === undefined) ? 'N/A' : String(item[col.key as keyof ExchangeAssetDetail])
-                      }
-                    </TableCell>
-                  ))}
-                </TableRow>
-              )) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground py-3 px-4 text-xs sm:text-sm">
-                    {initialAssets && initialAssets.length === 0 ? `No data available for ${exchangeName}.` : `No assets match "${searchTerm}".`}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+            )) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground py-3 px-4 text-xs sm:text-sm">
+                  {initialAssets && initialAssets.length === 0 ? `No data available for ${exchangeName}.` : `No assets match "${searchTerm}".`}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
        {(initialAssets && initialAssets.length > 0 && sortedAndFilteredData.length > 0) && (
          <div className="p-3 text-xs text-muted-foreground border-t">
@@ -386,3 +385,4 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
   );
 }
 
+    
