@@ -386,3 +386,5 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
 }
 
     
+
+    
