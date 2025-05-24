@@ -1,15 +1,68 @@
 
-import { getAsterProcessedData } from '@/lib/aster-api';
-import type { ExchangeData } from '@/types';
-import { AssetDataTable } from '@/components/asset-data-table';
-import { CandlestickChart } from 'lucide-react';
+'use client'; // Required for useState, useEffect
 
-export default async function AsterDexPage() {
-  const asterResult = await getAsterProcessedData();
-  // Ensure asterResult itself is not null before accessing its properties
-  const asterExchangeData: ExchangeData | null = asterResult 
-    ? { name: 'Aster', metrics: asterResult.metrics, assets: asterResult.assets } 
-    : null;
+import React, { useState, useEffect, useMemo } from 'react';
+import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api';
+import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookEntry } from '@/types';
+import { AssetDataTable } from '@/components/asset-data-table';
+import { OrderBookDisplay } from '@/components/order-book-display';
+import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; // Though it will show "Not Available"
+import { CandlestickChart, Info } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+export default function AsterDexPage() {
+  const [exchangeData, setExchangeData] = useState<{ assets: ExchangeAssetDetail[] } | null>(null);
+  const [orderBook, setOrderBook] = useState<AsterOrderBookData | null>(null);
+  const [selectedSymbolForOrderBook, setSelectedSymbolForOrderBook] = useState<string | null>(null);
+  const [isLoadingPageData, setIsLoadingPageData] = useState(true);
+  const [isLoadingOrderBook, setIsLoadingOrderBook] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      setIsLoadingPageData(true);
+      const result = await getAsterProcessedData();
+      setExchangeData({ assets: result.assets });
+      // Set initial symbol for order book (e.g., top volume asset)
+      if (result.assets.length > 0) {
+        setSelectedSymbolForOrderBook(result.assets[0].id);
+      }
+      setIsLoadingPageData(false);
+    }
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSymbolForOrderBook) {
+      async function loadOrderBook() {
+        setIsLoadingOrderBook(true);
+        setOrderBook(null); // Clear previous order book
+        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook, 50); // Limit to 50 levels
+        setOrderBook(obData);
+        setIsLoadingOrderBook(false);
+      }
+      loadOrderBook();
+    }
+  }, [selectedSymbolForOrderBook]);
+
+  const availableSymbolsForOrderBook = useMemo(() => {
+    return exchangeData?.assets.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
+  }, [exchangeData]);
+
+  if (isLoadingPageData) {
+    return (
+      <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
+        <header className="pb-4 mb-6 border-b">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <CandlestickChart className="h-8 w-8 text-primary" />
+            AsterDex Exchange Data
+          </h1>
+          <p className="text-muted-foreground mt-1">Detailed asset information from AsterDex.</p>
+        </header>
+        <Skeleton className="h-24 w-full mb-6" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
@@ -22,8 +75,28 @@ export default async function AsterDexPage() {
       </header>
 
       <section>
+        <LongShortRatioDisplay
+          ratioData={null} // Aster does not provide this in the documented API
+          exchangeName="Aster"
+          isLoading={false} // Not applicable for Aster in this setup
+        />
+      </section>
+
+      <section>
+        <OrderBookDisplay
+          bidsRaw={orderBook?.bids as AsterOrderBookEntry[] | null}
+          asksRaw={orderBook?.asks as AsterOrderBookEntry[] | null}
+          exchangeName="Aster"
+          selectedSymbol={selectedSymbolForOrderBook}
+          availableSymbols={availableSymbolsForOrderBook}
+          onSymbolChange={setSelectedSymbolForOrderBook}
+          isLoading={isLoadingOrderBook}
+        />
+      </section>
+      
+      <section>
         <AssetDataTable 
-          initialAssets={asterExchangeData?.assets ?? null} 
+          assets={exchangeData?.assets ?? []} 
           exchangeName="Aster" 
         />
       </section>

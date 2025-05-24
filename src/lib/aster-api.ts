@@ -1,5 +1,5 @@
 
-import type { AsterTicker24hr, AsterOpenInterest, AsterExchangeInfo, ExchangeAssetDetail, ExchangeAggregatedMetrics, AsterExchangeSymbol } from '@/types';
+import type { AsterTicker24hr, AsterOpenInterest, AsterExchangeInfo, ExchangeAssetDetail, ExchangeAggregatedMetrics, AsterExchangeSymbol, AsterOrderBookData } from '@/types';
 
 const ASTER_API_BASE_URL = 'https://fapi.asterdex.com/fapi/v1';
 
@@ -43,8 +43,7 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/openInterest?symbol=${symbol}`);
     if (!response.ok) {
-      // Some symbols might not have OI data, treat 400 as potentially "no data"
-      if (response.status !== 400) { // Log other errors
+      if (response.status !== 400) {
          console.error(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
       }
       return null;
@@ -56,6 +55,21 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
   }
 }
 
+export async function fetchAsterOrderBook(symbol: string, limit: number = 20): Promise<AsterOrderBookData | null> {
+  try {
+    const response = await fetch(`${ASTER_API_BASE_URL}/depth?symbol=${symbol}&limit=${limit}`);
+    if (!response.ok) {
+      console.error(`Aster API error (depth for ${symbol}): ${response.status} ${await response.text()}`);
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Failed to fetch Aster order book for ${symbol}:`, error);
+    return null;
+  }
+}
+
+
 export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
   const symbolsInfo = await fetchAsterExchangeInfo();
   const allTickers = await fetchAsterAllTickers24hr();
@@ -65,31 +79,32 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
   let totalDailyTrades = 0;
   const assets: ExchangeAssetDetail[] = [];
 
-  // Create a map for quick ticker lookup
   const tickerMap = new Map<string, AsterTicker24hr>();
   allTickers.forEach(ticker => tickerMap.set(ticker.symbol, ticker));
 
   for (const symbolInfo of symbolsInfo) {
     const ticker = tickerMap.get(symbolInfo.symbol);
-    if (!ticker) continue; // Only process symbols that have ticker data and are in exchangeInfo
+    if (!ticker) continue; 
 
     const price = parseFloatSafe(ticker.lastPrice);
-    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume); // Use quoteVolume for USD equivalent
+    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume); 
     const dailyTrades = ticker.count;
 
     totalDailyVolume += dailyVolumeQuote;
     totalDailyTrades += dailyTrades;
     
     let openInterestValue = 0;
+    // Add a delay before fetching OI to respect rate limits even during initial load.
+    await new Promise(resolve => setTimeout(resolve, 50)); // Increased delay
     const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest);
-      openInterestValue = oiBase * price; // OI in quote currency
+      openInterestValue = oiBase * price; 
       totalOpenInterest += openInterestValue;
     }
 
     assets.push({
-      id: symbolInfo.symbol, // Using symbol as unique ID for Aster
+      id: symbolInfo.symbol,
       symbol: symbolInfo.symbol, 
       price: price,
       dailyVolume: dailyVolumeQuote,
@@ -98,10 +113,6 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       exchange: 'Aster',
       iconUrl: `https://placehold.co/32x32.png?text=${symbolInfo.baseAsset}`,
     });
-    
-    // Add a small delay after each symbol processing (especially after an API call for OI)
-    // to be more respectful of potential rate limits not explicitly burst-related.
-    await new Promise(resolve => setTimeout(resolve, 30)); // 30ms delay
   }
   
   return {
@@ -110,6 +121,6 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       totalOpenInterest,
       totalDailyTrades,
     },
-    assets: assets.sort((a, b) => b.dailyVolume - a.dailyVolume), // Sort by volume desc
+    assets: assets.sort((a, b) => b.dailyVolume - a.dailyVolume),
   };
 }

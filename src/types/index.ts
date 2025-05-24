@@ -49,7 +49,6 @@ export interface AsterOpenInterest {
 
 export interface AsterExchangeSymbolFilter {
   filterType: string;
-  // Define other filter properties if needed, e.g., PRICE_FILTER
   minPrice?: string;
   maxPrice?: string;
   tickSize?: string;
@@ -75,7 +74,15 @@ export interface AsterExchangeSymbol {
 
 export interface AsterExchangeInfo {
   symbols: AsterExchangeSymbol[];
-  // other properties from exchangeInfo if needed
+}
+
+export type AsterOrderBookEntry = [string, string]; // [price, quantity]
+export interface AsterOrderBookData {
+  lastUpdateId: number;
+  E: number; // Message output time
+  T: number; // Transaction time
+  bids: AsterOrderBookEntry[];
+  asks: AsterOrderBookEntry[];
 }
 
 
@@ -89,14 +96,12 @@ export interface EdgeXContract {
   stepSize: string;
   minOrderSize: string;
   maxOrderSize: string;
-  // ... other fields from getMetaData contractList
   enableTrade: boolean;
   enableDisplay: boolean;
 }
 
 export interface EdgeXMetaData {
   contractList: EdgeXContract[];
-  // ... other fields from getMetaData
 }
 
 export interface EdgeXTicker {
@@ -120,13 +125,43 @@ export interface EdgeXTicker {
   nextFundingTime: string;
 }
 
+export interface EdgeXLongShortRatioItem {
+  range: string;
+  contractId: string; // Can be "_total_" or a specific contract ID
+  exchange: string; // e.g., "_total_"
+  buyRatio: string;
+  sellRatio: string;
+  buyVolUsd: string;
+  sellVolUsd: string;
+  createdTime: string;
+  updatedTime: string;
+}
+
+export interface EdgeXLongShortRatioData {
+  exchangeLongShortRatioList: EdgeXLongShortRatioItem[];
+  allRangeList: string[]; // e.g., ["30m", "1h", "4h"]
+}
+
+export type EdgeXOrderBookEntryRaw = { price: string; size: string };
+export interface EdgeXOrderBookData {
+  startVersion: string;
+  endVersion: string;
+  level: number;
+  contractId: string;
+  contractName: string;
+  asks: EdgeXOrderBookEntryRaw[];
+  bids: EdgeXOrderBookEntryRaw[];
+  depthType: "SNAPSHOT" | "CHANGED";
+}
+
+
 // --- Unified/Comparison Types ---
 export interface ExchangeAssetDetail {
   id: string; // Aster: symbol, EdgeX: contractId
   symbol: string; // Common trading symbol, e.g. BTC/USDT
   price: number;
   dailyVolume: number; // In quote currency
-  openInterest: number; // In quote currency or base - needs consistency
+  openInterest: number; // In quote currency
   dailyTrades: number;
   exchange: 'Aster' | 'EdgeX';
   iconUrl?: string; // Optional icon
@@ -134,7 +169,7 @@ export interface ExchangeAssetDetail {
 
 export interface ExchangeAggregatedMetrics {
   totalDailyVolume: number; // In quote currency
-  totalOpenInterest: number; // In quote currency or base
+  totalOpenInterest: number; // In quote currency
   totalDailyTrades: number;
 }
 
@@ -143,3 +178,10 @@ export interface ExchangeData {
   metrics: ExchangeAggregatedMetrics;
   assets: ExchangeAssetDetail[];
 }
+
+// Unified Order Book Entry for display
+export type UnifiedOrderBookEntry = {
+  price: number;
+  quantity: number;
+  total?: number; // Optional cumulative quantity
+};
