@@ -55,21 +55,22 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
   let minimumFractionDigits = defaultPrecision;
   let maximumFractionDigits = defaultPrecision;
 
-  if (price > 0 && price < 0.000001) {
+  if (price > 0 && Math.abs(price) < 0.000001) { // Use Math.abs for very small negative numbers too
     return `$${price.toExponential(2)}`;
-  } else if (price > 0 && price < highPrecisionThreshold / 1000) {
-    minimumFractionDigits = 6;
-    maximumFractionDigits = 8;
-  } else if (price > 0 && price < highPrecisionThreshold / 100) {
-    minimumFractionDigits = 5;
-    maximumFractionDigits = 6;
-  } else if (price > 0 && price < highPrecisionThreshold / 10) {
-    minimumFractionDigits = 4;
-    maximumFractionDigits = 5;
-  } else if (price > 0 && price < highPrecisionThreshold) {
-    minimumFractionDigits = 3;
-    maximumFractionDigits = 4;
+  } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 1000) {
+    minimumFractionDigits = Math.min(8, defaultPrecision + 4); // Cap precision
+    maximumFractionDigits = Math.min(8, defaultPrecision + 4);
+  } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 100) {
+    minimumFractionDigits = Math.min(6, defaultPrecision + 3);
+    maximumFractionDigits = Math.min(6, defaultPrecision + 3);
+  } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 10) {
+    minimumFractionDigits = Math.min(5, defaultPrecision + 2);
+    maximumFractionDigits = Math.min(5, defaultPrecision + 2);
+  } else if (price > 0 && Math.abs(price) < highPrecisionThreshold) {
+    minimumFractionDigits = Math.min(4, defaultPrecision + 1);
+    maximumFractionDigits = Math.min(4, defaultPrecision + 1);
   }
+
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -194,7 +195,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     return () => {
       ws.close();
     };
-  }, [isClient, exchangeName, internalAssets.length]);
+  }, [isClient, exchangeName, internalAssets.length]); // internalAssets.length ensures re-connect if initialAssets changes drastically
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -242,16 +243,16 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     { key: '', label: '#', className: "w-[40px] text-center", sticky: 'left', stickyOffset: '0px', minWidth: '40px' },
     { key: 'symbol', label: 'Symbol', className: "w-[180px] md:w-[200px]", sticky: 'left', stickyOffset: '40px', minWidth: '180px' },
     { key: 'price', label: 'Price', numeric: true, minWidth: '120px' },
-    { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, minWidth: '120px' },
-    { key: 'fundingRate', label: 'Funding Rate', numeric: true, minWidth: '130px' },
-    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, minWidth: '150px' },
-    { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, minWidth: '150px' },
-    { key: 'openInterest', label: 'Open Interest', icon: BookOpen, numeric: true, minWidth: '150px' },
-    { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, minWidth: '130px' },
-    { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, minWidth: '130px' },
-    { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, minWidth: '130px' },
-    { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, minWidth: '130px' },
-    { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, minWidth: '130px' },
+    { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, minWidth: '110px' },
+    { key: 'fundingRate', label: 'Funding Rate', numeric: true, minWidth: '120px' },
+    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, minWidth: '140px' },
+    { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, minWidth: '130px' },
+    { key: 'openInterest', label: 'Open Interest', icon: BookOpen, numeric: true, minWidth: '140px' },
+    { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, minWidth: '110px' },
+    { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, minWidth: '120px' },
+    { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, minWidth: '120px' },
+    { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, minWidth: '120px' },
+    { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, minWidth: '120px' },
   ];
 
   if (!isClient || !initialAssets) {
@@ -291,11 +292,11 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-[600px] overflow-auto">
-          <Table className="min-w-full table-fixed">
-            <TableHeader className="sticky top-0 z-20 shadow-sm bg-card">
+      <CardContent className="p-0 h-[600px] overflow-y-auto"> {/* Vertical scroll on CardContent */}
+          <Table className="table-fixed"> {/* Horizontal scroll handled by Table's inner div */}
+            <TableHeader className="sticky top-0 z-20 shadow-sm">
               <TableRow>
-                {columns.map(col => (
+                {columns.map((col, colIndex) => (
                   <TableHead
                     key={col.key || col.label}
                     className={cn(
@@ -303,13 +304,13 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                         col.className || '',
                         col.key ? 'cursor-pointer hover:bg-muted/50' : '',
                         col.numeric ? 'text-right' : 'text-left',
-                        col.sticky === 'left' ? 'sticky z-10' : ''
+                        col.sticky === 'left' ? 'sticky z-10' : '',
+                        colIndex === 1 ? 'border-r' : '' // Add border to the "Symbol" column header
                     )}
                     style={{ 
                         left: col.sticky === 'left' ? col.stickyOffset : undefined, 
-                        backgroundColor: 'hsl(var(--card))',
+                        backgroundColor: 'hsl(var(--card))', // Explicit background for sticky header
                         minWidth: col.minWidth,
-                        width: col.minWidth, // Helps enforce minWidth more reliably
                     }}
                     onClick={() => col.key && handleSort(col.key)}
                   >
@@ -325,7 +326,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             <TableBody>
               {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
                 <TableRow key={item.id} className="hover:bg-muted/20 h-10 group">
-                  {columns.map(col => (
+                  {columns.map((col, colIndex) => (
                     <TableCell
                       key={`${item.id}-${col.key || col.label}`}
                       className={cn(
@@ -334,19 +335,19 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                         col.numeric ? 'text-right font-mono' : 'text-left',
                         col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.priceChangePercent24h) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
                         col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) ?? 0) < 0 ? 'text-red-500 dark:text-red-400' : (parseFloatSafe(item.fundingRate) ?? 0) > 0 ? 'text-green-500 dark:text-green-400' : '',
-                        col.sticky === 'left' ? 'sticky z-10' : ''
+                        col.sticky === 'left' ? 'sticky z-10' : '',
+                        colIndex === 1 ? 'border-r' : '' // Add border to the "Symbol" column cells
                       )}
                        style={{
                         left: col.sticky === 'left' ? col.stickyOffset : undefined, 
-                        backgroundColor: 'hsl(var(--card))', // Important for sticky cells
+                        backgroundColor: 'hsl(var(--card))', // Explicit background for sticky cells
                         minWidth: col.minWidth,
-                        width: col.minWidth, // Helps enforce minWidth
                        }}
                     >
                       {col.key === '' ? index + 1 :
                        col.key === 'symbol' ? (
                         <div className="flex items-center gap-2">
-                          {item.iconUrl && <Image data-ai-hint={`${item.symbol.split('/')[0]} crypto`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
+                          {item.iconUrl && <Image data-ai-hint={`${item.symbol.split('/')[0] || item.symbol.split('USDT')[0] || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
                           <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
                         </div>
                        ) :
