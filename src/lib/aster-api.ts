@@ -3,12 +3,28 @@ import type { AsterTicker24hr, AsterOpenInterest, AsterExchangeInfo, ExchangeAss
 
 const ASTER_API_BASE_URL = 'https://fapi.asterdex.com/fapi/v1';
 
-// Helper to safely parse numbers, returning 0 if NaN or invalid
-const parseFloatSafe = (value: string | number | undefined, defaultValue = 0): number => {
-  if (value === undefined || value === null || String(value).trim() === '') return defaultValue; // Added null and empty string check
+// Helper to safely parse numbers, returning 0 if NaN or invalid, or null if specified
+const parseFloatSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
   const num = parseFloat(String(value));
-  return isNaN(num) ? defaultValue : num;
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
 };
+
+const parseIntSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
+  const num = parseInt(String(value), 10);
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
+}
 
 export async function fetchAsterExchangeInfo(): Promise<AsterExchangeSymbol[]> {
   try {
@@ -43,7 +59,7 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/openInterest?symbol=${symbol}`);
     if (!response.ok) {
-      if (response.status !== 400) { // Don't log for 400 (e.g. symbol not found for OI)
+      if (response.status !== 400) { 
          console.error(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
       }
       return null;
@@ -88,7 +104,7 @@ export async function fetchAsterOrderBook(symbol: string, limit: number = 20): P
 export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
   const symbolsInfo = await fetchAsterExchangeInfo();
   const allTickers = await fetchAsterAllTickers24hr();
-  const allPremiumIndices = await fetchAsterAllPremiumIndex(); // Fetch all funding rates once
+  const allPremiumIndices = await fetchAsterAllPremiumIndex();
 
   let totalDailyVolume = 0;
   let totalOpenInterest = 0;
@@ -105,37 +121,40 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     const ticker = tickerMap.get(symbolInfo.symbol);
     if (!ticker) continue; 
 
-    const price = parseFloatSafe(ticker.lastPrice);
-    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume); 
-    const dailyTrades = ticker.count;
+    const price = parseFloatSafe(ticker.lastPrice) ?? 0;
+    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume) ?? 0; 
+    const dailyTrades = parseIntSafe(ticker.count) ?? 0;
 
     totalDailyVolume += dailyVolumeQuote;
     totalDailyTrades += dailyTrades;
     
     let openInterestValue = 0;
-    // Add a delay before fetching OI to respect rate limits even during initial load.
-    await new Promise(resolve => setTimeout(resolve, 30)); // 30ms delay per symbol for OI
+    // Add a delay before fetching OI to respect rate limits.
+    await new Promise(resolve => setTimeout(resolve, 30)); // 30ms delay
     const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
     if (oiData) {
-      const oiBase = parseFloatSafe(oiData.openInterest);
+      const oiBase = parseFloatSafe(oiData.openInterest) ?? 0;
       openInterestValue = oiBase * price; 
       totalOpenInterest += openInterestValue;
     }
 
     const premiumIndex = premiumIndexMap.get(symbolInfo.symbol);
-    const fundingRate = premiumIndex ? parseFloatSafe(premiumIndex.lastFundingRate, null) : null; // Allow null if not found
-    const nextFundingTime = premiumIndex ? premiumIndex.nextFundingTime : null;
-
-
+    
     assets.push({
       id: symbolInfo.symbol,
       symbol: symbolInfo.symbol, 
       price: price,
       dailyVolume: dailyVolumeQuote,
+      baseAssetVolume24h: parseFloatSafe(ticker.volume),
       openInterest: openInterestValue,
       dailyTrades: dailyTrades,
-      fundingRate: fundingRate,
-      nextFundingTime: nextFundingTime,
+      fundingRate: premiumIndex ? parseFloatSafe(premiumIndex.lastFundingRate, true) : null,
+      nextFundingTime: premiumIndex ? premiumIndex.nextFundingTime : null,
+      priceChangePercent24h: parseFloatSafe(ticker.priceChangePercent, true),
+      high24h: parseFloatSafe(ticker.highPrice, true),
+      low24h: parseFloatSafe(ticker.lowPrice, true),
+      markPrice: premiumIndex ? parseFloatSafe(premiumIndex.markPrice, true) : null,
+      indexPrice: premiumIndex ? parseFloatSafe(premiumIndex.indexPrice, true) : null,
       exchange: 'Aster',
       iconUrl: `https://placehold.co/32x32.png?text=${symbolInfo.baseAsset.substring(0,3)}`,
     });
@@ -147,6 +166,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       totalOpenInterest,
       totalDailyTrades,
     },
-    assets: assets.sort((a, b) => b.dailyVolume - a.dailyVolume),
+    assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
+

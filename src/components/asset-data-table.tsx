@@ -13,11 +13,11 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-// import { Button } from '@/components/ui/button'; // Button removed as Clear Filters was removed
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpDown, Search, Info, Percent } from 'lucide-react';
+import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { format, fromUnixTime } from 'date-fns';
 
 
 interface AssetDataTableProps {
@@ -28,21 +28,43 @@ interface AssetDataTableProps {
 type SortKey = keyof ExchangeAssetDetail | '';
 type SortOrder = 'asc' | 'desc';
 
-const parseFloatSafe = (value: string | number | undefined, defaultValue = 0): number => {
+const parseFloatSafe = (value: string | number | undefined | null, defaultValue = 0): number => {
     if (value === undefined || value === null) return defaultValue;
     const num = parseFloat(String(value));
     return isNaN(num) ? defaultValue : num;
 };
 
-const formatPrice = (price: number | undefined) => {
+const formatPrice = (price: number | undefined | null, defaultPrecision = 2, highPrecisionThreshold = 0.1) => {
   if (price === undefined || price === null) return 'N/A';
-  if (price < 0.0001 && price > 0) return `$${price.toPrecision(2)}`;
-  if (price < 0.01 && price > 0) return `$${price.toPrecision(3)}`;
-  if (price < 0.1) return `$${price.toFixed(4)}`;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price);
+  
+  let minimumFractionDigits = defaultPrecision;
+  let maximumFractionDigits = defaultPrecision;
+
+  if (price > 0 && price < 0.000001) { // Very small numbers
+    return `$${price.toExponential(2)}`;
+  } else if (price > 0 && price < highPrecisionThreshold / 1000) {
+    minimumFractionDigits = 6;
+    maximumFractionDigits = 8;
+  } else if (price > 0 && price < highPrecisionThreshold / 100) {
+    minimumFractionDigits = 5;
+    maximumFractionDigits = 6;
+  } else if (price > 0 && price < highPrecisionThreshold / 10) {
+    minimumFractionDigits = 4;
+    maximumFractionDigits = 5;
+  } else if (price > 0 && price < highPrecisionThreshold) {
+    minimumFractionDigits = 3;
+    maximumFractionDigits = 4;
+  }
+  
+  return new Intl.NumberFormat('en-US', { 
+    style: 'currency', 
+    currency: 'USD', 
+    minimumFractionDigits, 
+    maximumFractionDigits 
+  }).format(price);
 };
 
-const formatLargeNumber = (num: number | undefined) => {
+const formatLargeNumber = (num: number | undefined | null) => {
   if (num === undefined || num === null) return 'N/A';
   if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
   if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
@@ -50,9 +72,23 @@ const formatLargeNumber = (num: number | undefined) => {
   return num.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
 };
 
+const formatPercentage = (percentage: number | undefined | null) => {
+  if (percentage === undefined || percentage === null) return 'N/A';
+  return `${percentage.toFixed(2)}%`;
+};
+
 const formatFundingRate = (rate: number | null | undefined) => {
   if (rate === null || rate === undefined) return 'N/A';
   return `${(rate * 100).toFixed(4)}%`;
+};
+
+const formatUnixTimestamp = (timestamp: number | null | undefined) => {
+  if (timestamp === null || timestamp === undefined) return 'N/A';
+  // Timestamps from APIs are often in milliseconds or seconds.
+  // Date constructor expects milliseconds. If it's seconds, multiply by 1000.
+  const date = (String(timestamp).length === 10) ? fromUnixTime(timestamp) : new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  return format(date, 'MMM d, HH:mm');
 };
 
 
@@ -82,7 +118,6 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     const ws = new WebSocket(endpoint);
 
     ws.onopen = () => {
-      // console.log(`${exchangeName} WebSocket connected`);
       if (exchangeName === 'EdgeX') {
         ws.send(JSON.stringify({ type: "subscribe", channel: "ticker.all" }));
       }
@@ -96,8 +131,8 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
 
         if (exchangeName === 'Aster' && message.stream === '!ticker@arr' && Array.isArray(message.data)) {
           priceUpdates = message.data.map((ticker: any) => ({
-            id: ticker.s, // symbol
-            price: parseFloatSafe(ticker.c) // last price
+            id: ticker.s, 
+            price: parseFloatSafe(ticker.c) 
           }));
         } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Changed" && Array.isArray(message.content?.data) ) {
            priceUpdates = message.content.data.map((ticker: any) => ({
@@ -105,17 +140,15 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             price: parseFloatSafe(ticker.lastPrice)
           }));
         } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Snapshot" && Array.isArray(message.content?.data) ) {
-          // EdgeX also sends Snapshots, handle them similarly
           priceUpdates = message.content.data.map((ticker: any) => ({
             id: ticker.contractId,
             price: parseFloatSafe(ticker.lastPrice)
           }));
         }
 
-
         if (priceUpdates.length > 0) {
           setInternalAssets(prevAssets => {
-            const newAssets = [...prevAssets]; // Create a new array to trigger re-render
+            const newAssets = [...prevAssets]; 
             let updated = false;
             priceUpdates.forEach(update => {
               const assetIndex = newAssets.findIndex(asset => asset.id === update.id);
@@ -144,7 +177,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     return () => {
       ws.close();
     };
-  }, [isClient, exchangeName, internalAssets.length]); // internalAssets.length to potentially re-init ws if assets get wiped
+  }, [isClient, exchangeName, internalAssets.length]); 
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -165,14 +198,14 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       filtered.sort((a, b) => {
         const valA = a[sortKey as keyof ExchangeAssetDetail];
         const valB = b[sortKey as keyof ExchangeAssetDetail];
+        
+        // Handle null or undefined for sorting, typically pushing them to the end or beginning
+        if (valA === null || valA === undefined) return sortOrder === 'asc' ? 1 : -1;
+        if (valB === null || valB === undefined) return sortOrder === 'asc' ? -1 : 1;
 
         if (typeof valA === 'number' && typeof valB === 'number') {
           return sortOrder === 'asc' ? valA - valB : valB - valA;
         }
-         if (valA === null && valB !== null) return sortOrder === 'asc' ? -1 : 1;
-         if (valA !== null && valB === null) return sortOrder === 'asc' ? 1 : -1;
-         if (valA === null && valB === null) return 0;
-
         if (typeof valA === 'string' && typeof valB === 'string') {
           return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
@@ -185,21 +218,27 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
   const renderSortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
     return sortOrder === 'asc' ?
-      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" /> : // Replace with ArrowUp when available
-      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" />; // Replace with ArrowDown when available
+      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" /> : 
+      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
-  const columns: { key: SortKey; label: string; className?: string, numeric?: boolean }[] = [
+  const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string, numeric?: boolean }[] = [
     { key: '', label: '#', className: "w-[40px] text-center sticky left-0 bg-card z-10" },
     { key: 'symbol', label: 'Symbol', className: "w-[150px] sticky left-[40px] bg-card z-10" },
     { key: 'price', label: 'Price', numeric: true },
-    { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "w-[130px]" },
+    { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, className: "w-[120px]" },
+    { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, className: "w-[130px]" },
+    { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, className: "w-[130px]" },
     { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, className: "w-[150px]" },
     { key: 'openInterest', label: 'Open Interest', numeric: true, className: "w-[150px]" },
+    { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, className: "w-[130px]" },
+    { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, className: "w-[130px]" },
+    { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "w-[130px]" },
+    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, className: "w-[150px]" }, // Not numeric for display
     { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, className: "w-[130px]" },
   ];
 
-  if (!isClient || !initialAssets) { // Still check initialAssets for skeleton
+  if (!isClient || !initialAssets) { 
     return (
       <Card className="shadow-lg rounded-lg overflow-hidden">
         <CardHeader>
@@ -251,6 +290,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     onClick={() => col.key && handleSort(col.key)}
                   >
                     <div className={`flex items-center ${col.numeric ? 'justify-end' : 'justify-start'}`}>
+                      {col.icon && <col.icon className="mr-1 h-3.5 w-3.5 text-muted-foreground shrink-0" />}
                       {col.label}
                       {col.key && renderSortIcon(col.key)}
                     </div>
@@ -260,7 +300,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             </TableHeader>
             <TableBody>
               {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
-                <TableRow key={item.id} className="hover:bg-muted/20 h-10">
+                <TableRow key={item.id} className="hover:bg-muted/20 h-10 group">
                   <TableCell className="text-center text-muted-foreground py-1.5 px-3 text-xs sm:text-sm sticky left-0 bg-card group-hover:bg-muted/20 z-10">{index + 1}</TableCell>
                   <TableCell className="py-1.5 px-3 text-xs sm:text-sm sticky left-[40px] bg-card group-hover:bg-muted/20 z-10">
                     <div className="flex items-center gap-2">
@@ -269,11 +309,19 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.price)}</TableCell>
+                  <TableCell className={`text-right font-mono py-1.5 px-3 text-xs sm:text-sm ${item.priceChangePercent24h && item.priceChangePercent24h < 0 ? 'text-red-500' : item.priceChangePercent24h && item.priceChangePercent24h > 0 ? 'text-green-500' : ''}`}>
+                    {formatPercentage(item.priceChangePercent24h)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.high24h)}</TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.low24h)}</TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.dailyVolume)}</TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.openInterest)}</TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.markPrice)}</TableCell>
+                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.indexPrice)}</TableCell>
                   <TableCell className={`text-right font-mono py-1.5 px-3 text-xs sm:text-sm ${item.fundingRate && item.fundingRate < 0 ? 'text-red-500' : item.fundingRate && item.fundingRate > 0 ? 'text-green-500' : ''}`}>
                     {formatFundingRate(item.fundingRate)}
                   </TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.dailyVolume)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.openInterest)}</TableCell>
+                  <TableCell className="text-left font-mono py-1.5 px-3 text-xs sm:text-sm">{formatUnixTimestamp(item.nextFundingTime)}</TableCell>
                   <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.dailyTrades)}</TableCell>
                 </TableRow>
               )) : (
@@ -289,9 +337,10 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       </CardContent>
        {(initialAssets && initialAssets.length > 0 && sortedAndFilteredData.length > 0) && (
          <div className="p-3 text-xs text-muted-foreground border-t">
-           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Prices are updated in real-time. Other metrics update on page load.
+           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Price is updated in real-time via WebSocket. Other metrics update on page load or interaction.
          </div>
        )}
     </Card>
   );
 }
+

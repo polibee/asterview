@@ -101,17 +101,19 @@ export interface AsterOrderBookData {
 export interface EdgeXContract {
   contractId: string;
   contractName: string; // e.g., BTCUSDT
-  baseCoinId: string;
-  quoteCoinId: string;
+  baseCoinId: string; // This is often the base asset like 'BTC'
+  quoteCoinId: string; // This is often the quote asset like 'USDT'
   tickSize: string;
   stepSize: string;
   minOrderSize: string;
   maxOrderSize: string;
   enableTrade: boolean;
   enableDisplay: boolean;
+  starkExSyntheticAssetId?: string; // used for placeholder icon generation
 }
 
 export interface EdgeXMetaData {
+  coinList: { coinId: string, coinName: string, iconUrl: string }[];
   contractList: EdgeXContract[];
 }
 
@@ -131,33 +133,33 @@ export interface EdgeXTicker {
   indexPrice: string;
   oraclePrice: string;
   openInterest: string;
-  fundingRate: string; // This field exists in ticker for EdgeX, can be used directly
-  fundingTime: string;
-  nextFundingTime: string;
+  fundingRate: string; 
+  fundingTime: string; // This is the settlement time for the current fundingRate
+  nextFundingTime: string; // Next settlement time
 }
 
 export interface EdgeXFundingRateItem {
     contractId: string;
-    fundingTime: string; // Timestamp string
-    fundingTimestamp: string; // Timestamp string
+    fundingTime: string; // Timestamp string for when this rate applies/settled
+    fundingTimestamp: string; // Timestamp string of calculation
     oraclePrice: string;
     indexPrice: string;
     fundingRate: string; // The actual funding rate
     isSettlement: boolean;
-    forecastFundingRate: string;
-    previousFundingRate: string;
-    previousFundingTimestamp: string; // Timestamp string
+    forecastFundingRate?: string; // Optional as per some responses
+    previousFundingRate?: string; // Optional
+    previousFundingTimestamp?: string; // Optional
     premiumIndex: string;
     avgPremiumIndex: string;
-    premiumIndexTimestamp: string; // Timestamp string
+    premiumIndexTimestamp: string;
     impactMarginNotional: string;
     impactAskPrice: string;
     impactBidPrice: string;
     interestRate: string;
-    predictedFundingRate: string;
+    predictedFundingRate?: string; // Optional
     fundingRateIntervalMin: string;
     starkExFundingIndex: string;
-    nextFundingTime?: string; // Not in API doc, but Ticker has it, useful to add if available
+    nextFundingTime?: string; // Added for consistency if available, but EdgeXTicker also has it
 }
 
 export interface EdgeXLatestFundingRateResponse {
@@ -207,10 +209,17 @@ export interface ExchangeAssetDetail {
   symbol: string; // Common trading symbol, e.g. BTC/USDT
   price: number;
   dailyVolume: number; // In quote currency
+  baseAssetVolume24h?: number; // In base currency
   openInterest: number; // In quote currency
   dailyTrades: number;
-  fundingRate: number | null; // Added
-  nextFundingTime?: number | null; // Added, optional
+  fundingRate: number | null;
+  nextFundingTime: number | null;
+  priceChangePercent24h: number | null;
+  high24h: number | null;
+  low24h: number | null;
+  markPrice: number | null;
+  indexPrice: number | null;
+  oraclePrice?: number | null; // Optional, mainly for EdgeX
   exchange: 'Aster' | 'EdgeX';
   iconUrl?: string; // Optional icon
 }
@@ -233,3 +242,4 @@ export type UnifiedOrderBookEntry = {
   quantity: number;
   total?: number; // Optional cumulative quantity
 };
+

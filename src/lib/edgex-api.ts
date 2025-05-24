@@ -3,24 +3,40 @@ import type { EdgeXMetaData, EdgeXTicker, EdgeXContract, ExchangeAssetDetail, Ex
 
 const EDGEX_API_BASE_URL = 'https://pro.edgex.exchange/api/v1/public';
 
-const parseFloatSafe = (value: string | number | undefined, defaultValue = 0): number => {
-  if (value === undefined || value === null || String(value).trim() === '') return defaultValue; // Added null and empty string check
+const parseFloatSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
   const num = parseFloat(String(value));
-  return isNaN(num) ? defaultValue : num;
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
 };
 
-export async function fetchEdgeXMetaData(): Promise<EdgeXContract[]> {
+const parseIntSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
+  const num = parseInt(String(value), 10);
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
+}
+
+export async function fetchEdgeXMetaData(): Promise<EdgeXMetaData | null> {
   try {
     const response = await fetch(`${EDGEX_API_BASE_URL}/meta/getMetaData`);
     if (!response.ok) {
       console.error(`EdgeX API error (getMetaData): ${response.status} ${await response.text()}`);
-      return [];
+      return null;
     }
     const data: { data: EdgeXMetaData } = await response.json();
-    return data.data.contractList.filter(c => c.enableDisplay && c.enableTrade);
+    return data.data;
   } catch (error) {
     console.error('Failed to fetch EdgeX metadata:', error);
-    return [];
+    return null;
   }
 }
 
@@ -41,7 +57,6 @@ export async function fetchEdgeXAllTickers(): Promise<EdgeXTicker[]> {
 
 export async function fetchEdgeXLatestFundingRates(): Promise<EdgeXFundingRateItem[]> {
   try {
-    // Assuming contractId is optional to fetch for all, as per EdgeX API doc
     const response = await fetch(`${EDGEX_API_BASE_URL}/funding/getLatestFundingRate`);
     if (!response.ok) {
       console.error(`EdgeX API error (getLatestFundingRate): ${response.status} ${await response.text()}`);
@@ -61,8 +76,6 @@ export async function fetchEdgeXLatestFundingRates(): Promise<EdgeXFundingRateIt
 
 
 export async function fetchEdgeXLongShortRatio(range: string = "1h"): Promise<EdgeXLongShortRatioData | null> {
-  // API docs indicate range is optional, but we make it selectable.
-  // filterContractIdList can be empty for aggregate.
   try {
     const response = await fetch(`${EDGEX_API_BASE_URL}/quote/getExchangeLongShortRatio?range=${range}`);
     if (!response.ok) {
@@ -78,7 +91,6 @@ export async function fetchEdgeXLongShortRatio(range: string = "1h"): Promise<Ed
 }
 
 export async function fetchEdgeXOrderBook(contractId: string, level: number = 15): Promise<EdgeXOrderBookData[] | null> {
-  // API returns an array, even for a single contractId
   try {
     const response = await fetch(`${EDGEX_API_BASE_URL}/quote/getDepth?contractId=${contractId}&level=${level}`);
     if (!response.ok) {
@@ -94,9 +106,15 @@ export async function fetchEdgeXOrderBook(contractId: string, level: number = 15
 }
 
 export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
-  const allContractsMeta = await fetchEdgeXMetaData();
+  const metaData = await fetchEdgeXMetaData();
+  if (!metaData) {
+    return { metrics: { totalDailyVolume: 0, totalOpenInterest: 0, totalDailyTrades: 0 }, assets: [] };
+  }
+  const allContractsMeta = metaData.contractList.filter(c => c.enableDisplay && c.enableTrade);
+  const coinMetaMap = new Map(metaData.coinList.map(coin => [coin.coinId, coin]));
+
   const allTickers = await fetchEdgeXAllTickers();
-  const allFundingRates = await fetchEdgeXLatestFundingRates(); // Fetch all funding rates once
+  const allFundingRates = await fetchEdgeXLatestFundingRates(); 
 
   let totalDailyVolume = 0;
   let totalOpenInterest = 0;
@@ -115,32 +133,39 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
         continue;
     }
 
-    const price = parseFloatSafe(ticker.lastPrice);
-    const dailyVolumeQuote = parseFloatSafe(ticker.value); 
-    const openInterestBase = parseFloatSafe(ticker.openInterest);
+    const price = parseFloatSafe(ticker.lastPrice) ?? 0;
+    const dailyVolumeQuote = parseFloatSafe(ticker.value) ?? 0; 
+    const openInterestBase = parseFloatSafe(ticker.openInterest) ?? 0;
     const openInterestQuote = openInterestBase * price; 
-    const dailyTrades = parseInt(ticker.trades, 10) || 0;
+    const dailyTrades = parseIntSafe(ticker.trades) ?? 0;
 
     totalDailyVolume += dailyVolumeQuote;
     totalOpenInterest += openInterestQuote;
     totalDailyTrades += dailyTrades;
 
     const fundingInfo = fundingRateMap.get(ticker.contractId);
-    const fundingRate = fundingInfo ? parseFloatSafe(fundingInfo.fundingRate, null) : (ticker.fundingRate ? parseFloatSafe(ticker.fundingRate, null) : null);
-    const nextFundingTime = fundingInfo ? parseFloatSafe(fundingInfo.fundingTime, null) : (ticker.nextFundingTime ? parseFloatSafe(ticker.nextFundingTime, null) : null); // EdgeX Ticker also has nextFundingTime
-
+    
+    const baseCoinInfo = coinMetaMap.get(contractInfo.baseCoinId);
+    const iconUrl = baseCoinInfo?.iconUrl || `https://placehold.co/32x32.png?text=${contractInfo.baseCoinId.substring(0,3)}`;
 
     assets.push({
       id: ticker.contractId,
       symbol: ticker.contractName,
       price,
       dailyVolume: dailyVolumeQuote,
+      baseAssetVolume24h: parseFloatSafe(ticker.size),
       openInterest: openInterestQuote,
       dailyTrades,
-      fundingRate: fundingRate,
-      nextFundingTime: nextFundingTime,
+      fundingRate: fundingInfo ? parseFloatSafe(fundingInfo.fundingRate, true) : parseFloatSafe(ticker.fundingRate, true),
+      nextFundingTime: fundingInfo ? parseIntSafe(fundingInfo.nextFundingTime || ticker.nextFundingTime, true) : parseIntSafe(ticker.nextFundingTime, true),
+      priceChangePercent24h: parseFloatSafe(ticker.priceChangePercent, true),
+      high24h: parseFloatSafe(ticker.high, true),
+      low24h: parseFloatSafe(ticker.low, true),
+      markPrice: null, // EdgeX ticker doesn't directly provide a 'markPrice' like some exchanges. Index/Oracle are closer.
+      indexPrice: parseFloatSafe(ticker.indexPrice, true),
+      oraclePrice: parseFloatSafe(ticker.oraclePrice, true),
       exchange: 'EdgeX',
-      iconUrl: `https://placehold.co/32x32.png?text=${contractInfo.baseCoinId.substring(0,3)}`, 
+      iconUrl: iconUrl, 
     });
   }
 
@@ -150,6 +175,7 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
       totalOpenInterest,
       totalDailyTrades,
     },
-    assets: assets.sort((a, b) => b.dailyVolume - a.dailyVolume),
+    assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
+
