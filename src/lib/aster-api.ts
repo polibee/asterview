@@ -71,7 +71,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
 
   for (const symbolInfo of symbolsInfo) {
     const ticker = tickerMap.get(symbolInfo.symbol);
-    if (!ticker) continue;
+    if (!ticker) continue; // Only process symbols that have ticker data and are in exchangeInfo
 
     const price = parseFloatSafe(ticker.lastPrice);
     const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume); // Use quoteVolume for USD equivalent
@@ -81,8 +81,6 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     totalDailyTrades += dailyTrades;
     
     let openInterestValue = 0;
-    // Fetch OI only for relevant symbols to manage API calls
-    // For futures, OI is usually quoted in base currency amount or contracts. To sum it up in quote currency: OI_base * price
     const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest);
@@ -91,8 +89,8 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     }
 
     assets.push({
-      id: symbolInfo.symbol,
-      symbol: symbolInfo.symbol, // Assuming symbol is like BTCUSDT
+      id: symbolInfo.symbol, // Using symbol as unique ID for Aster
+      symbol: symbolInfo.symbol, 
       price: price,
       dailyVolume: dailyVolumeQuote,
       openInterest: openInterestValue,
@@ -100,12 +98,12 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       exchange: 'Aster',
       iconUrl: `https://placehold.co/32x32.png?text=${symbolInfo.baseAsset}`,
     });
+    
+    // Add a small delay after each symbol processing (especially after an API call for OI)
+    // to be more respectful of potential rate limits not explicitly burst-related.
+    await new Promise(resolve => setTimeout(resolve, 30)); // 30ms delay
   }
   
-  // Simulate delay for rate limiting awareness for Aster, actual calls are spaced by await
-  await new Promise(resolve => setTimeout(resolve, 25)); // Small delay between OI fetches (inside loop implicitly)
-
-
   return {
     metrics: {
       totalDailyVolume,
