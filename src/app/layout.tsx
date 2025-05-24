@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
+  SidebarRail, // Added SidebarRail
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { LayoutDashboard, CandlestickChart, BarChart3, Waves } from 'lucide-react';
@@ -41,7 +42,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <SidebarProvider defaultOpen>
-          <Sidebar>
+          <Sidebar> {/* Default collapsible prop is "offcanvas" which works with SidebarRail */}
             <SidebarHeader>
               <Link href="/" className="flex items-center gap-2 px-2 py-1 group">
                 <Waves className="h-7 w-7 text-sidebar-primary" />
@@ -63,7 +64,7 @@ export default function RootLayout({
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <Link href="/asterdex">
-                      <CandlestickChart /> 
+                      <CandlestickChart />
                       <span className="group-data-[collapsible=icon]:hidden">AsterDex</span>
                     </Link>
                   </SidebarMenuButton>
@@ -79,6 +80,7 @@ export default function RootLayout({
               </SidebarMenu>
             </SidebarContent>
           </Sidebar>
+          <SidebarRail /> {/* Added this component to enable desktop collapse/expand */}
           <SidebarInset>
             <div className="flex flex-col min-h-screen bg-muted/30">
               <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">
