@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
-  SidebarRail, // Added SidebarRail
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { LayoutDashboard, CandlestickChart, BarChart3, Waves } from 'lucide-react';
@@ -42,7 +42,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <SidebarProvider defaultOpen>
-          <Sidebar> {/* Default collapsible prop is "offcanvas" which works with SidebarRail */}
+          <Sidebar collapsible="icon"> {/* Ensure collapsible="icon" for desktop icon mode */}
             <SidebarHeader>
               <Link href="/" className="flex items-center gap-2 px-2 py-1 group">
                 <Waves className="h-7 w-7 text-sidebar-primary" />
@@ -54,7 +54,7 @@ export default function RootLayout({
             <SidebarContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild tooltip="Overview">
                     <Link href="/">
                       <LayoutDashboard />
                       <span className="group-data-[collapsible=icon]:hidden">Overview</span>
@@ -62,7 +62,7 @@ export default function RootLayout({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild tooltip="AsterDex">
                     <Link href="/asterdex">
                       <CandlestickChart />
                       <span className="group-data-[collapsible=icon]:hidden">AsterDex</span>
@@ -70,7 +70,7 @@ export default function RootLayout({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild tooltip="EdgeX">
                     <Link href="/edgex">
                       <BarChart3 />
                       <span className="group-data-[collapsible=icon]:hidden">EdgeX</span>
@@ -80,7 +80,7 @@ export default function RootLayout({
               </SidebarMenu>
             </SidebarContent>
           </Sidebar>
-          <SidebarRail /> {/* Added this component to enable desktop collapse/expand */}
+          <SidebarRail />
           <SidebarInset>
             <div className="flex flex-col min-h-screen bg-muted/30">
               <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background px-4 md:hidden">

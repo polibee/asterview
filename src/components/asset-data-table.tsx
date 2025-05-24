@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// Removed ScrollArea import as we'll rely on Table's internal scroll
 import { cn } from '@/lib/utils';
 import { format, fromUnixTime } from 'date-fns';
 
@@ -34,13 +34,24 @@ const parseFloatSafe = (value: string | number | undefined | null, defaultValue 
     return isNaN(num) ? defaultValue : num;
 };
 
+const parseIntSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
+  const num = parseInt(String(value), 10);
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
+}
+
 const formatPrice = (price: number | undefined | null, defaultPrecision = 2, highPrecisionThreshold = 0.1) => {
-  if (price === undefined || price === null) return 'N/A';
+  if (price === undefined || price === null || isNaN(price)) return 'N/A';
   
   let minimumFractionDigits = defaultPrecision;
   let maximumFractionDigits = defaultPrecision;
 
-  if (price > 0 && price < 0.000001) { // Very small numbers
+  if (price > 0 && price < 0.000001) { 
     return `$${price.toExponential(2)}`;
   } else if (price > 0 && price < highPrecisionThreshold / 1000) {
     minimumFractionDigits = 6;
@@ -65,7 +76,7 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
 };
 
 const formatLargeNumber = (num: number | undefined | null) => {
-  if (num === undefined || num === null) return 'N/A';
+  if (num === undefined || num === null || isNaN(num)) return 'N/A';
   if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
   if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
   if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
@@ -73,19 +84,17 @@ const formatLargeNumber = (num: number | undefined | null) => {
 };
 
 const formatPercentage = (percentage: number | undefined | null) => {
-  if (percentage === undefined || percentage === null) return 'N/A';
+  if (percentage === undefined || percentage === null || isNaN(percentage)) return 'N/A';
   return `${percentage.toFixed(2)}%`;
 };
 
 const formatFundingRate = (rate: number | null | undefined) => {
-  if (rate === null || rate === undefined) return 'N/A';
+  if (rate === null || rate === undefined || isNaN(rate)) return 'N/A';
   return `${(rate * 100).toFixed(4)}%`;
 };
 
 const formatUnixTimestamp = (timestamp: number | null | undefined) => {
-  if (timestamp === null || timestamp === undefined) return 'N/A';
-  // Timestamps from APIs are often in milliseconds or seconds.
-  // Date constructor expects milliseconds. If it's seconds, multiply by 1000.
+  if (timestamp === null || timestamp === undefined || isNaN(timestamp)) return 'N/A';
   const date = (String(timestamp).length === 10) ? fromUnixTime(timestamp) : new Date(timestamp);
   if (isNaN(date.getTime())) return 'Invalid Date';
   return format(date, 'MMM d, HH:mm');
@@ -199,7 +208,6 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
         const valA = a[sortKey as keyof ExchangeAssetDetail];
         const valB = b[sortKey as keyof ExchangeAssetDetail];
         
-        // Handle null or undefined for sorting, typically pushing them to the end or beginning
         if (valA === null || valA === undefined) return sortOrder === 'asc' ? 1 : -1;
         if (valB === null || valB === undefined) return sortOrder === 'asc' ? -1 : 1;
 
@@ -222,9 +230,9 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
-  const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string, numeric?: boolean }[] = [
-    { key: '', label: '#', className: "w-[40px] text-center sticky left-0 bg-card z-10" },
-    { key: 'symbol', label: 'Symbol', className: "w-[150px] sticky left-[40px] bg-card z-10" },
+  const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string, numeric?: boolean, sticky?: 'left' | 'right', stickyOffset?: string }[] = [
+    { key: '', label: '#', className: "w-[40px] text-center", sticky: 'left', stickyOffset: '0px' },
+    { key: 'symbol', label: 'Symbol', className: "w-[150px]", sticky: 'left', stickyOffset: '40px' },
     { key: 'price', label: 'Price', numeric: true },
     { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, className: "w-[120px]" },
     { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, className: "w-[130px]" },
@@ -234,7 +242,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, className: "w-[130px]" },
     { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, className: "w-[130px]" },
     { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "w-[130px]" },
-    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, className: "w-[150px]" }, // Not numeric for display
+    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, className: "w-[150px]" },
     { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, className: "w-[130px]" },
   ];
 
@@ -246,7 +254,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             {exchangeName} Assets <Percent className="h-5 w-5 text-muted-foreground" />
           </CardTitle>
         </CardHeader>
-        <CardContent className="h-[400px] flex items-center justify-center">
+        <CardContent className="h-[600px] flex items-center justify-center">
           <div className="flex items-center text-muted-foreground">
             <Info size={16} className="mr-2" /> Loading asset data...
           </div>
@@ -273,20 +281,21 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="w-full h-[500px] whitespace-nowrap">
-          <Table className="min-w-full">
-            <TableHeader className="sticky top-0 bg-card z-20">
+      <CardContent className="p-0 h-[600px]"> {/* Added fixed height for vertical scroll */}
+          <Table className="min-w-full"> {/* Table itself handles overflow due to its wrapper */}
+            <TableHeader className="sticky top-0 bg-card z-20"> {/* Sticky header */}
               <TableRow>
                 {columns.map(col => (
                   <TableHead
                     key={col.key || col.label}
                     className={cn(
-                        "py-2 px-3 text-xs sm:text-sm",
+                        "py-2 px-3 text-xs sm:text-sm bg-card", // Ensure background for sticky
                         col.className || '', 
                         col.key ? 'cursor-pointer hover:bg-muted/50' : '', 
-                        col.numeric ? 'text-right' : 'text-left'
+                        col.numeric ? 'text-right' : 'text-left',
+                        col.sticky === 'left' ? 'sticky z-10' : '' // Apply sticky class
                     )}
+                    style={col.sticky === 'left' ? { left: col.stickyOffset } : {}}
                     onClick={() => col.key && handleSort(col.key)}
                   >
                     <div className={`flex items-center ${col.numeric ? 'justify-end' : 'justify-start'}`}>
@@ -301,28 +310,41 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             <TableBody>
               {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
                 <TableRow key={item.id} className="hover:bg-muted/20 h-10 group">
-                  <TableCell className="text-center text-muted-foreground py-1.5 px-3 text-xs sm:text-sm sticky left-0 bg-card group-hover:bg-muted/20 z-10">{index + 1}</TableCell>
-                  <TableCell className="py-1.5 px-3 text-xs sm:text-sm sticky left-[40px] bg-card group-hover:bg-muted/20 z-10">
-                    <div className="flex items-center gap-2">
-                      {item.iconUrl && <Image data-ai-hint={`${item.symbol.split('/')[0]} logo`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
-                      <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.price)}</TableCell>
-                  <TableCell className={`text-right font-mono py-1.5 px-3 text-xs sm:text-sm ${item.priceChangePercent24h && item.priceChangePercent24h < 0 ? 'text-red-500' : item.priceChangePercent24h && item.priceChangePercent24h > 0 ? 'text-green-500' : ''}`}>
-                    {formatPercentage(item.priceChangePercent24h)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.high24h)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.low24h)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.dailyVolume)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.openInterest)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.markPrice)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatPrice(item.indexPrice)}</TableCell>
-                  <TableCell className={`text-right font-mono py-1.5 px-3 text-xs sm:text-sm ${item.fundingRate && item.fundingRate < 0 ? 'text-red-500' : item.fundingRate && item.fundingRate > 0 ? 'text-green-500' : ''}`}>
-                    {formatFundingRate(item.fundingRate)}
-                  </TableCell>
-                  <TableCell className="text-left font-mono py-1.5 px-3 text-xs sm:text-sm">{formatUnixTimestamp(item.nextFundingTime)}</TableCell>
-                  <TableCell className="text-right font-mono py-1.5 px-3 text-xs sm:text-sm">{formatLargeNumber(item.dailyTrades)}</TableCell>
+                  {columns.map(col => (
+                    <TableCell
+                      key={`${item.id}-${col.key || col.label}`}
+                      className={cn(
+                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap bg-card group-hover:bg-muted/20", // Ensure background for sticky, add whitespace-nowrap
+                        col.className,
+                        col.numeric ? 'text-right font-mono' : 'text-left',
+                        col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) < 0 ? 'text-red-500' : parseFloatSafe(item.priceChangePercent24h) > 0 ? 'text-green-500' : ''),
+                        col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) < 0 ? 'text-red-500' : parseFloatSafe(item.fundingRate) > 0 ? 'text-green-500' : ''),
+                        col.sticky === 'left' ? 'sticky z-10' : '' // Apply sticky class
+                      )}
+                      style={col.sticky === 'left' ? { left: col.stickyOffset } : {}}
+                    >
+                      {col.key === '' ? index + 1 :
+                       col.key === 'symbol' ? (
+                        <div className="flex items-center gap-2">
+                          {item.iconUrl && <Image data-ai-hint={`${item.symbol.split('/')[0]} logo`} src={item.iconUrl} alt={item.symbol} width={18} height={18} className="rounded-full shrink-0" />}
+                          <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
+                        </div>
+                       ) :
+                       col.key === 'price' ? formatPrice(item.price) :
+                       col.key === 'priceChangePercent24h' ? formatPercentage(item.priceChangePercent24h) :
+                       col.key === 'high24h' ? formatPrice(item.high24h) :
+                       col.key === 'low24h' ? formatPrice(item.low24h) :
+                       col.key === 'dailyVolume' ? formatLargeNumber(item.dailyVolume) :
+                       col.key === 'openInterest' ? formatLargeNumber(item.openInterest) :
+                       col.key === 'markPrice' ? formatPrice(item.markPrice) :
+                       col.key === 'indexPrice' ? formatPrice(item.indexPrice) :
+                       col.key === 'fundingRate' ? formatFundingRate(item.fundingRate) :
+                       col.key === 'nextFundingTime' ? formatUnixTimestamp(item.nextFundingTime) :
+                       col.key === 'dailyTrades' ? formatLargeNumber(item.dailyTrades) :
+                       (item[col.key as keyof ExchangeAssetDetail] === null || item[col.key as keyof ExchangeAssetDetail] === undefined) ? 'N/A' : String(item[col.key as keyof ExchangeAssetDetail])
+                      }
+                    </TableCell>
+                  ))}
                 </TableRow>
               )) : (
                 <TableRow>
@@ -333,7 +355,6 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
               )}
             </TableBody>
           </Table>
-        </ScrollArea>
       </CardContent>
        {(initialAssets && initialAssets.length > 0 && sortedAndFilteredData.length > 0) && (
          <div className="p-3 text-xs text-muted-foreground border-t">
