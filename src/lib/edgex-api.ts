@@ -1,5 +1,5 @@
 
-import type { EdgeXMetaData, EdgeXTicker, EdgeXContract, ExchangeAssetDetail, ExchangeAggregatedMetrics, EdgeXLongShortRatioData, EdgeXOrderBookData, EdgeXLatestFundingRateResponse, EdgeXFundingRateItem } from '@/types';
+import type { EdgeXMetaData, EdgeXTicker, EdgeXContract, ExchangeAssetDetail, ExchangeAggregatedMetrics, EdgeXLongShortRatioData, EdgeXOrderBookData, EdgeXLatestFundingRateResponse, EdgeXFundingRateItem, EdgeXCoin } from '@/types';
 
 const EDGEX_API_BASE_URL = 'https://pro.edgex.exchange/api/v1/public';
 
@@ -108,8 +108,11 @@ export async function fetchEdgeXOrderBook(contractId: string, level: number = 15
 export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
   const metaData = await fetchEdgeXMetaData();
   if (!metaData) {
-    return { metrics: { totalDailyVolume: 0, totalOpenInterest: 0, totalDailyTrades: 0 }, assets: [] };
+    // Throw an error if metadata, which is critical, could not be fetched.
+    // The console.error is already done in fetchEdgeXMetaData.
+    throw new Error("Failed to fetch critical EdgeX metadata. Unable to process exchange data.");
   }
+  
   const allContractsMeta = metaData.contractList.filter(c => c.enableDisplay && c.enableTrade);
   const coinMetaMap = new Map(metaData.coinList.map(coin => [coin.coinId, coin]));
 
@@ -146,14 +149,20 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     const fundingInfo = fundingRateMap.get(ticker.contractId);
     
     const baseCoinInfo = coinMetaMap.get(contractInfo.baseCoinId);
-    const iconUrl = baseCoinInfo?.iconUrl || `https://placehold.co/32x32.png?text=${contractInfo.baseCoinId.substring(0,3)}`;
-
+    
+    // Prioritize iconUrl from coinList, then use contract baseCoin name for placeholder
+    let iconUrl = baseCoinInfo?.iconUrl;
+    if (!iconUrl) {
+      const baseCoinName = baseCoinInfo?.coinName || contractInfo.baseCoinId; // Use coinName if available
+      iconUrl = `https://placehold.co/32x32.png?text=${baseCoinName.substring(0,3).toUpperCase()}`;
+    }
+    
     assets.push({
       id: ticker.contractId,
       symbol: ticker.contractName,
       price,
       dailyVolume: dailyVolumeQuote,
-      baseAssetVolume24h: parseFloatSafe(ticker.size),
+      baseAssetVolume24h: parseFloatSafe(ticker.size, true),
       openInterest: openInterestQuote,
       dailyTrades,
       fundingRate: fundingInfo ? parseFloatSafe(fundingInfo.fundingRate, true) : parseFloatSafe(ticker.fundingRate, true),
@@ -161,7 +170,7 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
       priceChangePercent24h: parseFloatSafe(ticker.priceChangePercent, true),
       high24h: parseFloatSafe(ticker.high, true),
       low24h: parseFloatSafe(ticker.low, true),
-      markPrice: null, // EdgeX ticker doesn't directly provide a 'markPrice' like some exchanges. Index/Oracle are closer.
+      markPrice: null, // EdgeX ticker doesn't directly provide a 'markPrice'. Using index/oracle as alternatives.
       indexPrice: parseFloatSafe(ticker.indexPrice, true),
       oraclePrice: parseFloatSafe(ticker.oraclePrice, true),
       exchange: 'EdgeX',
