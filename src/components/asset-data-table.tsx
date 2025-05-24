@@ -20,17 +20,22 @@ import { format, fromUnixTime } from 'date-fns';
 
 
 interface AssetDataTableProps {
-  initialAssets: ExchangeAssetDetail[] | null; 
+  initialAssets: ExchangeAssetDetail[] | null;
   exchangeName: 'Aster' | 'EdgeX';
 }
 
 type SortKey = keyof ExchangeAssetDetail | '';
 type SortOrder = 'asc' | 'desc';
 
-const parseFloatSafe = (value: string | number | undefined | null, defaultValue = 0): number => {
-    if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
+const parseFloatSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
+    if (value === undefined || value === null || String(value).trim() === '') {
+      return returnNullOnNaN ? null : 0;
+    }
     const num = parseFloat(String(value));
-    return isNaN(num) ? defaultValue : num;
+    if (isNaN(num)) {
+      return returnNullOnNaN ? null : 0;
+    }
+    return num;
 };
 
 const parseIntSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
@@ -46,11 +51,11 @@ const parseIntSafe = (value: string | number | undefined | null, returnNullOnNaN
 
 const formatPrice = (price: number | undefined | null, defaultPrecision = 2, highPrecisionThreshold = 0.1) => {
   if (price === undefined || price === null || isNaN(price)) return 'N/A';
-  
+
   let minimumFractionDigits = defaultPrecision;
   let maximumFractionDigits = defaultPrecision;
 
-  if (price > 0 && price < 0.000001) { 
+  if (price > 0 && price < 0.000001) {
     return `$${price.toExponential(2)}`;
   } else if (price > 0 && price < highPrecisionThreshold / 1000) {
     minimumFractionDigits = 6;
@@ -65,12 +70,12 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
     minimumFractionDigits = 3;
     maximumFractionDigits = 4;
   }
-  
-  return new Intl.NumberFormat('en-US', { 
-    style: 'currency', 
-    currency: 'USD', 
-    minimumFractionDigits, 
-    maximumFractionDigits 
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits,
+    maximumFractionDigits
   }).format(price);
 };
 
@@ -84,12 +89,16 @@ const formatLargeNumber = (num: number | undefined | null) => {
 
 const formatPercentage = (percentage: number | undefined | null) => {
   if (percentage === undefined || percentage === null || isNaN(percentage)) return 'N/A';
-  return `${parseFloatSafe(percentage).toFixed(2)}%`;
+  const num = parseFloatSafe(percentage);
+  if (num === null) return 'N/A';
+  return `${num.toFixed(2)}%`;
 };
 
 const formatFundingRate = (rate: number | null | undefined) => {
   if (rate === null || rate === undefined || isNaN(rate)) return 'N/A';
-  return `${(parseFloatSafe(rate) * 100).toFixed(4)}%`;
+  const num = parseFloatSafe(rate);
+  if (num === null) return 'N/A';
+  return `${(num * 100).toFixed(4)}%`;
 };
 
 const formatUnixTimestamp = (timestamp: number | null | undefined) => {
@@ -119,8 +128,8 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
   useEffect(() => {
     if (!isClient || internalAssets.length === 0) return;
 
-    const endpoint = exchangeName === 'Aster' 
-        ? 'wss://fstream.asterdex.com/stream?streams=!ticker@arr' 
+    const endpoint = exchangeName === 'Aster'
+        ? 'wss://fstream.asterdex.com/stream?streams=!ticker@arr'
         : 'wss://pro.edgex.exchange/api/v1/public/ws';
 
     const ws = new WebSocket(endpoint);
@@ -134,29 +143,29 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data as string);
-        
+
         let priceUpdates: { id: string, price: number }[] = [];
 
         if (exchangeName === 'Aster' && message.stream === '!ticker@arr' && Array.isArray(message.data)) {
           priceUpdates = message.data.map((ticker: any) => ({
-            id: ticker.s, 
-            price: parseFloatSafe(ticker.c) 
+            id: ticker.s,
+            price: parseFloatSafe(ticker.c) ?? 0
           }));
         } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Changed" && Array.isArray(message.content?.data) ) {
            priceUpdates = message.content.data.map((ticker: any) => ({
             id: ticker.contractId,
-            price: parseFloatSafe(ticker.lastPrice)
+            price: parseFloatSafe(ticker.lastPrice) ?? 0
           }));
         } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Snapshot" && Array.isArray(message.content?.data) ) {
           priceUpdates = message.content.data.map((ticker: any) => ({
             id: ticker.contractId,
-            price: parseFloatSafe(ticker.lastPrice)
+            price: parseFloatSafe(ticker.lastPrice) ?? 0
           }));
         }
 
         if (priceUpdates.length > 0) {
           setInternalAssets(prevAssets => {
-            const newAssets = [...prevAssets]; 
+            const newAssets = [...prevAssets];
             let updated = false;
             priceUpdates.forEach(update => {
               const assetIndex = newAssets.findIndex(asset => asset.id === update.id);
@@ -185,7 +194,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     return () => {
       ws.close();
     };
-  }, [isClient, exchangeName, internalAssets.length]); 
+  }, [isClient, exchangeName, internalAssets.length]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -206,7 +215,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       filtered.sort((a, b) => {
         const valA = a[sortKey as keyof ExchangeAssetDetail];
         const valB = b[sortKey as keyof ExchangeAssetDetail];
-        
+
         if (valA === null || valA === undefined) return sortOrder === 'asc' ? 1 : -1;
         if (valB === null || valB === undefined) return sortOrder === 'asc' ? -1 : 1;
 
@@ -225,32 +234,33 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
   const renderSortIcon = (key: SortKey) => {
     if (sortKey !== key) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
     return sortOrder === 'asc' ?
-      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" /> : 
+      <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" /> :
       <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
   const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string, numeric?: boolean, sticky?: 'left' | 'right', stickyOffset?: string }[] = [
     { key: '', label: '#', className: "w-[40px] text-center", sticky: 'left', stickyOffset: '0px' },
-    { key: 'symbol', label: 'Symbol', className: "w-[150px]", sticky: 'left', stickyOffset: '40px' }, // Adjusted offset based on '#' width
-    { key: 'price', label: 'Price', numeric: true },
-    { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, className: "w-[120px]" },
-    { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, className: "w-[130px]" },
-    { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, className: "w-[130px]" },
-    { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, className: "w-[150px]" },
-    { key: 'openInterest', label: 'Open Interest', icon: BookOpen, numeric: true, className: "w-[150px]" },
-    { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, className: "w-[130px]" },
-    { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, className: "w-[130px]" },
-    { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "w-[130px]" },
-    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, className: "w-[150px]" },
-    { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, className: "w-[130px]" },
+    { key: 'symbol', label: 'Symbol', className: "min-w-[150px] max-w-[200px]", sticky: 'left', stickyOffset: '40px' },
+    { key: 'price', label: 'Price', numeric: true, className: "min-w-[120px]" },
+    { key: 'priceChangePercent24h', label: '24h Chg %', icon: Percent, numeric: true, className: "min-w-[120px]" },
+    { key: 'fundingRate', label: 'Funding Rate', numeric: true, className: "min-w-[130px]" },
+    { key: 'nextFundingTime', label: 'Next Funding', icon: CalendarClock, numeric: false, className: "min-w-[150px]" },
+    { key: 'dailyVolume', label: 'Volume (24h)', numeric: true, className: "min-w-[150px]" },
+    { key: 'openInterest', label: 'Open Interest', icon: BookOpen, numeric: true, className: "min-w-[150px]" },
+    { key: 'dailyTrades', label: 'Trades (24h)', numeric: true, className: "min-w-[130px]" },
+    { key: 'high24h', label: '24h High', icon: TrendingUp, numeric: true, className: "min-w-[130px]" },
+    { key: 'low24h', label: '24h Low', icon: TrendingDown, numeric: true, className: "min-w-[130px]" },
+    { key: 'markPrice', label: 'Mark Price', icon: Target, numeric: true, className: "min-w-[130px]" },
+    { key: 'indexPrice', label: 'Index Price', icon: GanttChartSquare, numeric: true, className: "min-w-[130px]" },
   ];
 
-  if (!isClient || !initialAssets) { 
+  if (!isClient || !initialAssets) {
     return (
       <Card className="shadow-lg rounded-lg overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            {exchangeName} Assets <Percent className="h-5 w-5 text-muted-foreground" />
+            <BookOpen className="h-5 w-5 text-primary" />
+            {exchangeName} Assets
           </CardTitle>
         </CardHeader>
         <CardContent className="h-[600px] flex items-center justify-center">
@@ -267,7 +277,8 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     <Card className="shadow-lg rounded-lg overflow-hidden">
       <CardHeader className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0 pb-4">
         <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-            {exchangeName} Assets <Percent className="h-5 w-5 text-primary" />
+            <BookOpen className="h-5 w-5 text-primary" />
+            {exchangeName} Assets
         </CardTitle>
         <div className="relative w-full sm:w-auto sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -280,19 +291,19 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0 h-[600px] overflow-auto"> {/* CardContent handles vertical scroll */}
-          <Table className="min-w-full"> {/* Table itself provides horizontal scroll via its internal wrapper */}
-            <TableHeader className="sticky top-0 bg-card z-20 shadow-sm"> {/* Sticky header */}
-              <TableRow>
+      <CardContent className="p-0 h-[600px] overflow-auto">
+          <Table className="min-w-full">
+            <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">{/* Ensure no extra spaces/newlines here */}
+              <TableRow>{/* And here */}
                 {columns.map(col => (
                   <TableHead
                     key={col.key || col.label}
                     className={cn(
-                        "py-2 px-3 text-xs sm:text-sm bg-card", 
-                        col.className || '', 
-                        col.key ? 'cursor-pointer hover:bg-muted/50' : '', 
+                        "py-2 px-3 text-xs sm:text-sm bg-card",
+                        col.className || '',
+                        col.key ? 'cursor-pointer hover:bg-muted/50' : '',
                         col.numeric ? 'text-right' : 'text-left',
-                        col.sticky === 'left' ? 'sticky z-10' : '' 
+                        col.sticky === 'left' ? 'sticky z-10' : ''
                     )}
                     style={col.sticky === 'left' ? { left: col.stickyOffset, backgroundColor: 'hsl(var(--card))' } : {backgroundColor: 'hsl(var(--card))'}}
                     onClick={() => col.key && handleSort(col.key)}
@@ -313,11 +324,11 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     <TableCell
                       key={`${item.id}-${col.key || col.label}`}
                       className={cn(
-                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap group-hover:bg-muted/20", 
-                        col.className,
+                        "py-1.5 px-3 text-xs sm:text-sm whitespace-nowrap group-hover:bg-muted/20",
+                        col.className, // Apply specific column width/styles here
                         col.numeric ? 'text-right font-mono' : 'text-left',
-                        col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) < 0 ? 'text-red-500' : parseFloatSafe(item.priceChangePercent24h) > 0 ? 'text-green-500' : ''),
-                        col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) < 0 ? 'text-red-500' : parseFloatSafe(item.fundingRate) > 0 ? 'text-green-500' : ''),
+                        col.key === 'priceChangePercent24h' && (parseFloatSafe(item.priceChangePercent24h) ?? 0) < 0 ? 'text-red-500' : (parseFloatSafe(item.priceChangePercent24h) ?? 0) > 0 ? 'text-green-500' : '',
+                        col.key === 'fundingRate' && (parseFloatSafe(item.fundingRate) ?? 0) < 0 ? 'text-red-500' : (parseFloatSafe(item.fundingRate) ?? 0) > 0 ? 'text-green-500' : '',
                         col.sticky === 'left' ? 'sticky z-10' : ''
                       )}
                        style={col.sticky === 'left' ? { left: col.stickyOffset, backgroundColor: 'hsl(var(--card))' } : {}}
@@ -357,7 +368,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       </CardContent>
        {(initialAssets && initialAssets.length > 0 && sortedAndFilteredData.length > 0) && (
          <div className="p-3 text-xs text-muted-foreground border-t">
-           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Price is updated in real-time via WebSocket. Other metrics update on page load or interaction.
+           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Price is updated in real-time. Other metrics update on page load.
          </div>
        )}
     </Card>
