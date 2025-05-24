@@ -6,7 +6,7 @@ import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api';
 import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookEntry } from '@/types';
 import { AssetDataTable } from '@/components/asset-data-table';
 import { OrderBookDisplay } from '@/components/order-book-display';
-import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; // Though it will show "Not Available"
+import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; 
 import { CandlestickChart, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -20,13 +20,18 @@ export default function AsterDexPage() {
   useEffect(() => {
     async function loadData() {
       setIsLoadingPageData(true);
-      const result = await getAsterProcessedData();
-      setExchangeData({ assets: result.assets });
-      // Set initial symbol for order book (e.g., top volume asset)
-      if (result.assets.length > 0) {
-        setSelectedSymbolForOrderBook(result.assets[0].id);
+      try {
+        const result = await getAsterProcessedData();
+        setExchangeData({ assets: result.assets });
+        if (result.assets.length > 0 && result.assets[0]?.id) {
+          setSelectedSymbolForOrderBook(result.assets[0].id);
+        }
+      } catch (error) {
+        console.error("Error loading initial AsterDex page data:", error);
+        setExchangeData({ assets: [] }); // Fallback to empty data
+      } finally {
+        setIsLoadingPageData(false);
       }
-      setIsLoadingPageData(false);
     }
     loadData();
   }, []);
@@ -36,9 +41,15 @@ export default function AsterDexPage() {
       async function loadOrderBook() {
         setIsLoadingOrderBook(true);
         setOrderBook(null); // Clear previous order book
-        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook, 50); // Limit to 50 levels
-        setOrderBook(obData);
-        setIsLoadingOrderBook(false);
+        try {
+          const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook, 50); // Limit to 50 levels
+          setOrderBook(obData);
+        } catch (error) {
+          console.error(`Error loading AsterDex order book for ${selectedSymbolForOrderBook}:`, error);
+          setOrderBook(null); // Fallback
+        } finally {
+          setIsLoadingOrderBook(false);
+        }
       }
       loadOrderBook();
     }
@@ -48,7 +59,7 @@ export default function AsterDexPage() {
     return exchangeData?.assets.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
   }, [exchangeData]);
 
-  if (isLoadingPageData) {
+  if (isLoadingPageData && !exchangeData) { // Show skeleton only if no data yet
     return (
       <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
         <header className="pb-4 mb-6 border-b">
@@ -76,9 +87,9 @@ export default function AsterDexPage() {
 
       <section>
         <LongShortRatioDisplay
-          ratioData={null} // Aster does not provide this in the documented API
+          ratioData={null} 
           exchangeName="Aster"
-          isLoading={false} // Not applicable for Aster in this setup
+          isLoading={false} 
         />
       </section>
 
@@ -96,7 +107,7 @@ export default function AsterDexPage() {
       
       <section>
         <AssetDataTable 
-          assets={exchangeData?.assets ?? []} 
+          initialAssets={exchangeData?.assets ?? []} 
           exchangeName="Aster" 
         />
       </section>

@@ -24,12 +24,18 @@ export default function EdgeXPage() {
   useEffect(() => {
     async function loadInitialData() {
       setIsLoadingPageData(true);
-      const processedData = await getEdgeXProcessedData();
-      setExchangeData({ assets: processedData.assets });
-      if (processedData.assets.length > 0) {
-        setSelectedContractForOrderBook(processedData.assets[0].id); // Default to top asset
+      try {
+        const processedData = await getEdgeXProcessedData();
+        setExchangeData({ assets: processedData.assets });
+        if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
+          setSelectedContractForOrderBook(processedData.assets[0].id); // Default to top asset
+        }
+      } catch (error) {
+        console.error("Error loading initial EdgeX page data:", error);
+        setExchangeData({ assets: [] }); // Fallback to empty data
+      } finally {
+        setIsLoadingPageData(false);
       }
-      setIsLoadingPageData(false);
     }
     loadInitialData();
   }, []);
@@ -37,9 +43,15 @@ export default function EdgeXPage() {
   useEffect(() => {
     async function loadRatioData() {
       setIsLoadingRatio(true);
-      const ratioDataResult = await fetchEdgeXLongShortRatio(selectedRangeForRatio);
-      setLongShortRatio(ratioDataResult);
-      setIsLoadingRatio(false);
+      try {
+        const ratioDataResult = await fetchEdgeXLongShortRatio(selectedRangeForRatio);
+        setLongShortRatio(ratioDataResult);
+      } catch (error) {
+        console.error(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
+        setLongShortRatio(null); // Fallback
+      } finally {
+        setIsLoadingRatio(false);
+      }
     }
     loadRatioData();
   }, [selectedRangeForRatio]);
@@ -49,9 +61,15 @@ export default function EdgeXPage() {
       async function loadOrderBookData() {
         setIsLoadingOrderBook(true);
         setOrderBook(null); // Clear previous
-        const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20); // Level 20
-        setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
-        setIsLoadingOrderBook(false);
+        try {
+          const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 20); // Level 20
+          setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
+        } catch (error) {
+          console.error(`Error loading EdgeX order book for ${selectedContractForOrderBook}:`, error);
+          setOrderBook(null); // Fallback
+        } finally {
+          setIsLoadingOrderBook(false);
+        }
       }
       loadOrderBookData();
     }
@@ -67,7 +85,7 @@ export default function EdgeXPage() {
   }, [exchangeData]);
 
 
-  if (isLoadingPageData) {
+  if (isLoadingPageData && !exchangeData) { // Show skeleton only if no data yet
      return (
       <div className="container mx-auto px-4 md:px-6 py-8 space-y-8">
         <header className="pb-4 mb-6 border-b">
@@ -118,7 +136,7 @@ export default function EdgeXPage() {
 
       <section>
         <AssetDataTable 
-          assets={exchangeData?.assets ?? []} 
+          initialAssets={exchangeData?.assets ?? []} 
           exchangeName="EdgeX" 
         />
       </section>
