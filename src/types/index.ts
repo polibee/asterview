@@ -47,6 +47,17 @@ export interface AsterOpenInterest {
   time: number;
 }
 
+export interface AsterPremiumIndex {
+  symbol: string;
+  markPrice: string;
+  indexPrice: string;
+  estimatedSettlePrice: string;
+  lastFundingRate: string;
+  nextFundingTime: number;
+  interestRate: string;
+  time: number;
+}
+
 export interface AsterExchangeSymbolFilter {
   filterType: string;
   minPrice?: string;
@@ -120,10 +131,45 @@ export interface EdgeXTicker {
   indexPrice: string;
   oraclePrice: string;
   openInterest: string;
-  fundingRate: string;
+  fundingRate: string; // This field exists in ticker for EdgeX, can be used directly
   fundingTime: string;
   nextFundingTime: string;
 }
+
+export interface EdgeXFundingRateItem {
+    contractId: string;
+    fundingTime: string; // Timestamp string
+    fundingTimestamp: string; // Timestamp string
+    oraclePrice: string;
+    indexPrice: string;
+    fundingRate: string; // The actual funding rate
+    isSettlement: boolean;
+    forecastFundingRate: string;
+    previousFundingRate: string;
+    previousFundingTimestamp: string; // Timestamp string
+    premiumIndex: string;
+    avgPremiumIndex: string;
+    premiumIndexTimestamp: string; // Timestamp string
+    impactMarginNotional: string;
+    impactAskPrice: string;
+    impactBidPrice: string;
+    interestRate: string;
+    predictedFundingRate: string;
+    fundingRateIntervalMin: string;
+    starkExFundingIndex: string;
+    nextFundingTime?: string; // Not in API doc, but Ticker has it, useful to add if available
+}
+
+export interface EdgeXLatestFundingRateResponse {
+    code: string;
+    data: EdgeXFundingRateItem[];
+    msg: string | null;
+    errorParam: string | null;
+    requestTime: string;
+    responseTime: string;
+    traceId: string;
+}
+
 
 export interface EdgeXLongShortRatioItem {
   range: string;
@@ -163,6 +209,8 @@ export interface ExchangeAssetDetail {
   dailyVolume: number; // In quote currency
   openInterest: number; // In quote currency
   dailyTrades: number;
+  fundingRate: number | null; // Added
+  nextFundingTime?: number | null; // Added, optional
   exchange: 'Aster' | 'EdgeX';
   iconUrl?: string; // Optional icon
 }
