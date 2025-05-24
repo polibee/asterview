@@ -105,12 +105,13 @@ export async function fetchEdgeXOrderBook(contractId: string, level: number = 15
   }
 }
 
-export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
+export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics | null, assets: ExchangeAssetDetail[] }> {
   const metaData = await fetchEdgeXMetaData();
   if (!metaData) {
-    // Throw an error if metadata, which is critical, could not be fetched.
-    // The console.error is already done in fetchEdgeXMetaData.
-    throw new Error("Failed to fetch critical EdgeX metadata. Unable to process exchange data.");
+    // Metadata is critical. If it fails, we can't reliably process other data.
+    // fetchEdgeXMetaData already logs its own error.
+    console.warn("Critical EdgeX metadata could not be fetched. Returning empty data for EdgeX.");
+    return { metrics: null, assets: [] };
   }
   
   const allContractsMeta = metaData.contractList.filter(c => c.enableDisplay && c.enableTrade);
@@ -153,7 +154,9 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     let iconUrl = baseCoinInfo?.iconUrl;
     if (!iconUrl) {
       const baseCoinName = baseCoinInfo?.coinName || contractInfo.baseCoinId;
-      iconUrl = `https://placehold.co/32x32.png?text=${baseCoinName.substring(0,3).toUpperCase()}`;
+      // Use a placeholder that hints at the asset if no icon found
+      const assetHint = (baseCoinInfo?.coinName || ticker.contractName.replace('USDT', '').replace('PERP', '') || 'N/A').substring(0,3).toUpperCase();
+      iconUrl = `https://placehold.co/32x32.png?text=${assetHint}`;
     }
     
     assets.push({
@@ -169,7 +172,7 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
       priceChangePercent24h: parseFloatSafe(ticker.priceChangePercent, true),
       high24h: parseFloatSafe(ticker.high, true),
       low24h: parseFloatSafe(ticker.low, true),
-      markPrice: null, 
+      markPrice: null, // EdgeX ticker does not provide markPrice directly, funding endpoint has oracle/index
       indexPrice: parseFloatSafe(ticker.indexPrice, true),
       oraclePrice: parseFloatSafe(ticker.oraclePrice, true),
       exchange: 'EdgeX',
@@ -186,4 +189,3 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
-

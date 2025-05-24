@@ -29,20 +29,26 @@ export default function EdgeXPage() {
       setPageError(null);
       try {
         const processedData = await getEdgeXProcessedData();
-        if (processedData && processedData.assets) {
+        // Check if metrics is null (indicating a critical failure like missing metadata)
+        // or if assets array is present (even if empty, it means metadata was likely fetched)
+        if (processedData && processedData.metrics && processedData.assets) {
           setExchangeData({ assets: processedData.assets });
           if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
             setSelectedContractForOrderBook(processedData.assets[0].id);
+          } else if (processedData.assets.length === 0 && processedData.metrics) {
+            // Metadata might be fine, but no tradable assets returned. Not necessarily a page error yet.
+            setExchangeData({ assets: [] });
           }
         } else {
-          // This case should ideally be handled by getEdgeXProcessedData throwing an error
-          // if metadata or critical data fails to load.
-          throw new Error("Failed to process EdgeX exchange data or no assets returned.");
+           // This means getEdgeXProcessedData indicated a critical failure (e.g. by returning metrics: null)
+          console.error("Failed to load critical EdgeX data in page component.");
+          setPageError("Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
+          setExchangeData({ assets: [] });
         }
-      } catch (error: any) {
+      } catch (error: any) { // Catch any unexpected errors from getEdgeXProcessedData
         console.error("Error loading initial EdgeX page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] }); // Ensure assets is an empty array on error
+        setExchangeData({ assets: [] }); 
       } finally {
         setIsLoadingPageData(false);
       }
@@ -51,7 +57,7 @@ export default function EdgeXPage() {
   }, []); 
 
   useEffect(() => {
-    if (pageError) { // Don't fetch if there was a page-level error
+    if (pageError) { 
       setLongShortRatio(null);
       setIsLoadingRatio(false);
       return;
@@ -62,9 +68,9 @@ export default function EdgeXPage() {
       try {
         const ratioDataResult = await fetchEdgeXLongShortRatio(selectedRangeForRatio);
         setLongShortRatio(ratioDataResult);
-      } catch (error) { // Catching errors from fetchEdgeXLongShortRatio if it throws
+      } catch (error) { 
         console.warn(`Error loading EdgeX long/short ratio for range ${selectedRangeForRatio}:`, error);
-        setLongShortRatio(null); // Set to null on error
+        setLongShortRatio(null); 
       } finally {
         setIsLoadingRatio(false);
       }
@@ -73,8 +79,8 @@ export default function EdgeXPage() {
   }, [selectedRangeForRatio, pageError]);
 
   useEffect(() => {
-    if (pageError || !selectedContractForOrderBook) { // Don't fetch if page error or no symbol
-        setOrderBook(null); // Clear order book
+    if (pageError || !selectedContractForOrderBook) { 
+        setOrderBook(null); 
         setIsLoadingOrderBook(false);
         return;
     }
@@ -83,7 +89,6 @@ export default function EdgeXPage() {
       setIsLoadingOrderBook(true);
       setOrderBook(null); 
       try {
-        // Use a valid level for EdgeX API (15 or 200). Defaulting to 15.
         const obDataArray = await fetchEdgeXOrderBook(selectedContractForOrderBook, 15); 
         setOrderBook(obDataArray && obDataArray.length > 0 ? obDataArray[0] : null);
       } catch (error) {
@@ -121,7 +126,7 @@ export default function EdgeXPage() {
     );
   }
 
-  if (pageError && !isLoadingPageData) { // Show page error only after initial loading attempt
+  if (pageError && !isLoadingPageData) { 
     return (
       <div className="space-y-8">
         <header className="pb-4 mb-6 border-b">
