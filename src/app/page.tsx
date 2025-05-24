@@ -10,9 +10,9 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-primary text-primary-foreground shadow-md">
+      <header className="bg-background border-b text-foreground shadow-sm">
         <div className="container mx-auto px-4 py-6 flex items-center gap-3">
-          <Waves className="h-10 w-10" />
+          <Waves className="h-10 w-10 text-primary" />
           <h1 className="text-3xl font-bold tracking-tight">EdgeView</h1>
         </div>
       </header>
