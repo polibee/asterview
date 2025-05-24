@@ -1,4 +1,8 @@
-import type { GlobalMetrics } from '@/types';
+
+// This component is likely superseded by ExchangeComparisonSummary.
+// It was designed for the old mock global metrics.
+// Keeping for reference or if a simpler global metric display is needed later.
+import type { GlobalMetrics } from '@/types'; // Uses old GlobalMetrics type
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendingUp, BarChartBig, Coins, Bitcoin } from 'lucide-react';
 
@@ -60,3 +64,4 @@ export function MetricDisplay({ metrics }: MetricDisplayProps) {
     </div>
   );
 }
+
