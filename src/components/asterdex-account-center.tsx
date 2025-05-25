@@ -22,13 +22,24 @@ import {
   DollarSign, TrendingDown, TrendingUp, ListChecks, BarChart3, Landmark, Percent, Zap, ArrowUpRightSquare, Trophy, Info, Settings, AlertTriangle, WifiOff, Wifi
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, startOfUTCDay, endOfUTCDay, fromUnixTime } from 'date-fns';
+import { format, startOfUTCDay, endOfDay, fromUnixTime } from 'date-fns';
 
 const parseFloatSafe = (value: string | number | undefined | null, defaultValue: number | null = null): number | null => {
   if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
   const num = parseFloat(String(value));
   return isNaN(num) ? defaultValue : num;
 };
+
+const parseIntSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return returnNullOnNaN ? null : 0;
+  }
+  const num = parseInt(String(value), 10);
+  if (isNaN(num)) {
+    return returnNullOnNaN ? null : 0;
+  }
+  return num;
+}
 
 const formatUsd = (value: number | null, digits = 2) => {
   if (value === null || isNaN(value)) return 'N/A';
@@ -138,40 +149,38 @@ export function AsterdexAccountCenter() {
     let allTradesMakerVolume = 0;
 
     const todayStart = startOfUTCDay(new Date()).getTime();
-    const todayEnd = endOfUTCDay(new Date()).getTime();
+    const todayEnd = endOfDay(new Date()).getTime(); // Use endOfDay
 
     trades.forEach(trade => {
       totalRealizedPNL += parseFloatSafe(trade.realizedPnl) ?? 0;
       totalVolume += parseFloatSafe(trade.quoteQty) ?? 0;
-      totalFeesPaid += parseFloatSafe(trade.commission) ?? 0; // Commission can be negative (rebate)
+      totalFeesPaid += parseFloatSafe(trade.commission) ?? 0; 
 
       const tradeTime = typeof trade.time === 'string' ? parseIntSafe(trade.time) : trade.time;
       const tradeQuoteQty = parseFloatSafe(trade.quoteQty) ?? 0;
 
-      if (tradeTime >= todayStart && tradeTime <= todayEnd) {
-        if (trade.maker === false) { // Taker
+      if (tradeTime && tradeTime >= todayStart && tradeTime <= todayEnd) {
+        if (trade.maker === false) { 
           todayTakerVolume += tradeQuoteQty;
-        } else { // Maker
+        } else { 
           todayMakerVolume += tradeQuoteQty;
         }
       }
 
-      if (trade.maker === false) { // Taker
+      if (trade.maker === false) { 
         allTradesTakerVolume += tradeQuoteQty;
-      } else { // Maker
+      } else { 
         allTradesMakerVolume += tradeQuoteQty;
       }
     });
 
     const todayVolumeAuBoost = todayTakerVolume + (todayMakerVolume * 0.5);
     
-    // Au Trader Boost Tiers (from docs/asterpoint.md - "Adjust on 12 May")
-    let auTraderBoost = "1x"; // Base
+    let auTraderBoost = "1x"; 
     if (todayVolumeAuBoost >= 500000) auTraderBoost = "3x";
     else if (todayVolumeAuBoost >= 200000) auTraderBoost = "2.6x";
     else if (todayVolumeAuBoost >= 50000) auTraderBoost = "2.4x";
     else if (todayVolumeAuBoost >= 10000) auTraderBoost = "2x";
-    // Note: "New adjustment on 21 May" adds +1x, etc. This is the base multiplier.
 
     const rhPointsTotal = allTradesTakerVolume + (allTradesMakerVolume * 0.5);
 
@@ -202,7 +211,7 @@ export function AsterdexAccountCenter() {
         fetchAsterAccountInfo(apiKey, secretKey),
         fetchAsterPositions(apiKey, secretKey), 
         fetchAsterCommissionRate(apiKey, secretKey, defaultCommissionSymbol),
-        fetchAsterUserTrades(apiKey, secretKey, defaultCommissionSymbol, 200) // Fetch recent 200 trades for commission symbol
+        fetchAsterUserTrades(apiKey, secretKey, defaultCommissionSymbol, 200)
       ]);
 
       if (!accInfo || !balances) {
@@ -270,11 +279,11 @@ export function AsterdexAccountCenter() {
     localStorage.removeItem('asterApiKey');
     localStorage.removeItem('asterSecretKey');
     setIsApiKeysSet(false);
-    setAccountData(null); // Clear data
+    setAccountData(null); 
     setError(null);
     setWebSocketStatus('Disconnected');
     toast({ title: "Disconnected", description: "API Keys have been cleared." });
-    resetAccountDataToDefaults(); // Explicitly reset to defaults
+    resetAccountDataToDefaults(); 
   };
 
   const getPnlVariant = (pnl: number | null): MetricCardProps['variant'] => {
@@ -399,7 +408,7 @@ export function AsterdexAccountCenter() {
             <MetricCard 
               title="Total Realized PNL" 
               value={formatUsd(accountData?.totalRealizedPNL)} 
-              description={`Based on last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
+              description={`Last ${accountData?.userTrades?.length || 0} trades (${accountData?.commissionSymbol || 'symbol'})`}
               icon={TrendingUp} 
               isLoading={isLoading} 
               variant={getPnlVariant(accountData?.totalRealizedPNL)}
@@ -407,21 +416,21 @@ export function AsterdexAccountCenter() {
             <MetricCard 
               title="Total Trades" 
               value={formatNumber(accountData?.totalTrades)} 
-              description={`Last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
+              description={`Last ${accountData?.userTrades?.length || 0} trades (${accountData?.commissionSymbol || 'symbol'})`}
               icon={ListChecks} 
               isLoading={isLoading}
             />
             <MetricCard 
               title="Total Volume Traded" 
               value={formatUsd(accountData?.totalVolume)} 
-              description={`From last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
+              description={`Last ${accountData?.userTrades?.length || 0} trades (${accountData?.commissionSymbol || 'symbol'})`}
               icon={BarChart3} 
               isLoading={isLoading}
             />
             <MetricCard 
               title="Total Fees Paid" 
               value={formatUsd(accountData?.totalFeesPaid)} 
-              description={`From last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
+              description={`Last ${accountData?.userTrades?.length || 0} trades (${accountData?.commissionSymbol || 'symbol'})`}
               icon={Landmark} 
               isLoading={isLoading}
             />
@@ -445,7 +454,7 @@ export function AsterdexAccountCenter() {
              <MetricCard 
               title="Rh Points (Base)" 
               value={formatNumber(accountData?.rhPointsTotal)} 
-              description={`From last ${accountData?.userTrades?.length || 0} trades (before other boosts, ${accountData?.commissionSymbol || 'symbol'})`}
+              description={`Last ${accountData?.userTrades?.length || 0} trades (before other boosts, ${accountData?.commissionSymbol || 'symbol'})`}
               icon={Trophy} 
               isLoading={isLoading}
               className="lg:col-span-3"
@@ -470,6 +479,3 @@ export function AsterdexAccountCenter() {
     </div>
   );
 }
-
-
-    

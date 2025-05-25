@@ -1,4 +1,3 @@
-
 // src/app/edgex/page.tsx
 'use client';
 

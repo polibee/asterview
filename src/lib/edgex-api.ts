@@ -1,4 +1,3 @@
-
 // This file is deprecated as EdgeX functionality has been removed.
 // Keeping the file to avoid breaking imports if any remain, but its functions should not be used.
 
