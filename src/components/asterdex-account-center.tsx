@@ -111,18 +111,26 @@ export function AsterdexAccountCenter() {
   const loadAccountData = useCallback(async () => {
     if (!apiKey || !secretKey) {
       setError("API Key and Secret Key are required.");
-      setAccountData(prev => prev ? {...prev, webSocketStatus: 'Disconnected'} : null);
+      setAccountData(prev => ({
+        ...(prev || {} as AsterAccountSummaryData),
+        portfolioValue: null, totalUnrealizedPNL: null, totalRealizedPNL: null,
+        totalTrades: null, totalVolume: null, totalFeesPaid: null,
+        commissionRateMaker: null, commissionRateTaker: null, commissionSymbol: null,
+        todayVolumeAuBoost: null, auTraderBoost: null, rhPointsTotal: null,
+        balances: [], accountInfo: undefined, positions: [],
+        webSocketStatus: 'Disconnected'
+      }));
       return;
     }
     setIsLoading(true);
     setError(null);
-    const defaultCommissionSymbol = 'BTCUSDT'; // Default symbol for commission rates
+    const defaultCommissionSymbol = 'BTCUSDT'; 
 
     try {
       const [balances, accInfo, positions, commissionInfo] = await Promise.all([
         fetchAsterAccountBalances(apiKey, secretKey),
         fetchAsterAccountInfo(apiKey, secretKey),
-        fetchAsterPositions(apiKey, secretKey), // Fetch all positions initially
+        fetchAsterPositions(apiKey, secretKey), 
         fetchAsterCommissionRate(apiKey, secretKey, defaultCommissionSymbol)
       ]);
 
@@ -136,26 +144,25 @@ export function AsterdexAccountCenter() {
       setAccountData({
         portfolioValue,
         totalUnrealizedPNL,
-        totalRealizedPNL: null, // Placeholder - requires trade history processing
-        totalTrades: null, // Placeholder
-        totalVolume: null, // Placeholder
-        totalFeesPaid: null, // Placeholder
+        totalRealizedPNL: null, 
+        totalTrades: null, 
+        totalVolume: null, 
+        totalFeesPaid: null, 
         commissionRateMaker: commissionInfo?.makerCommissionRate ?? null,
         commissionRateTaker: commissionInfo?.takerCommissionRate ?? null,
         commissionSymbol: commissionInfo?.symbol ?? defaultCommissionSymbol,
-        todayVolumeAuBoost: null, // Placeholder for points program
-        auTraderBoost: null, // Placeholder
-        rhPointsTotal: null, // Placeholder
+        todayVolumeAuBoost: null, 
+        auTraderBoost: null, 
+        rhPointsTotal: null, 
         balances: balances || [],
         accountInfo: accInfo,
         positions: positions || [],
-        webSocketStatus: webSocketStatus, // Keep current WebSocket status
+        webSocketStatus: webSocketStatus, 
       });
 
     } catch (err: any) {
       setError(err.message || "An unknown error occurred while fetching account data.");
-      setAccountData(prev => ({
-        ...(prev || {} as AsterAccountSummaryData), // Ensure prev is not null
+      setAccountData({ // Ensure a defined structure even on error
         portfolioValue: null,
         totalUnrealizedPNL: null,
         totalRealizedPNL: null,
@@ -169,10 +176,10 @@ export function AsterdexAccountCenter() {
         auTraderBoost: null,
         rhPointsTotal: null,
         balances: [],
-        accountInfo: undefined, // Explicitly set to undefined or some default
+        accountInfo: undefined, 
         positions: [],
         webSocketStatus: 'Disconnected' 
-      }));
+      });
     } finally {
       setIsLoading(false);
     }
@@ -320,23 +327,23 @@ export function AsterdexAccountCenter() {
             <MetricCard 
               title="Commission Rates" 
               value={
-                  isLoading && !accountData?.commissionSymbol ? "Loading..." : // Show loading only if symbol is also loading
-                  (accountData?.commissionRateTaker !== null && accountData?.commissionRateMaker !== null) ? 
+                  isLoading && !(accountData && accountData.commissionSymbol) ? "Loading..." : 
+                  (accountData && accountData.commissionRateTaker !== null && accountData.commissionRateMaker !== null) ? 
                   (<>
                       <div>T: {formatCommissionRate(accountData.commissionRateTaker)}</div>
                       <div>M: {formatCommissionRate(accountData.commissionRateMaker)}</div>
                   </>) : "N/A"
               }
-              description={`For ${accountData?.commissionSymbol || 'default'}`}
+              description={`For ${accountData?.commissionSymbol || 'default symbol'}`}
               icon={Percent} 
-              isLoading={isLoading && !accountData?.commissionSymbol}
+              isLoading={isLoading && !(accountData && accountData.commissionSymbol)}
             />
             <MetricCard 
               title="Total Realized PNL" 
               value={formatUsd(accountData?.totalRealizedPNL)} 
               description="Requires trade history processing" 
               icon={TrendingUp} 
-              isLoading={isLoading} // Or a separate loading state for this
+              isLoading={isLoading} 
               variant={getPnlVariant(accountData?.totalRealizedPNL)}
             />
             <MetricCard 
