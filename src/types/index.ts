@@ -1,4 +1,5 @@
 
+
 export interface MarketData {
   id: string;
   symbol: string; // e.g., "BTC/USD"
@@ -63,6 +64,15 @@ export interface AsterExchangeSymbolFilter {
   minPrice?: string;
   maxPrice?: string;
   tickSize?: string;
+  // Other filter types might have different properties
+  minQty?: string;
+  maxQty?: string;
+  stepSize?: string;
+  limit?: number;
+  notional?: string;
+  multiplierUp?: string;
+  multiplierDown?: string;
+  multiplierDecimal?: number;
 }
 export interface AsterExchangeSymbol {
   symbol: string;
@@ -81,10 +91,13 @@ export interface AsterExchangeSymbol {
   filters: AsterExchangeSymbolFilter[];
   orderTypes: string[];
   timeInForce: string[];
+  liquidationFee?: string;
+  marketTakeBound?: string;
 }
 
 export interface AsterExchangeInfo {
   symbols: AsterExchangeSymbol[];
+  // other fields like rateLimits, serverTime, assets, timezone
 }
 
 export type AsterOrderBookEntry = [string, string]; // [price, quantity]
@@ -100,30 +113,44 @@ export interface AsterOrderBookData {
 export interface AsterAccountBalanceV2 {
   accountAlias: string;
   asset: string;
-  balance: string;
+  balance: string; // Wallet balance
+  wb?: string; // Wallet Balance (alternative key from WebSocket ACCOUNT_UPDATE)
   crossWalletBalance: string;
+  cw?: string; // Cross Wallet Balance (alternative key from WebSocket ACCOUNT_UPDATE)
   crossUnPnl: string;
   availableBalance: string;
   maxWithdrawAmount: string;
   marginAvailable: boolean;
   updateTime: number;
+  bc?: string; // Balance Change from WebSocket ACCOUNT_UPDATE
+  a?: string; // Asset (alternative key from WebSocket ACCOUNT_UPDATE)
 }
 
 export interface AsterPositionV2 {
   symbol: string;
+  s?: string; // Symbol (alternative key from WebSocket ACCOUNT_UPDATE)
   initialMargin: string;
   maintMargin: string;
   unrealizedProfit: string;
+  up?: string; // Unrealized Profit (alternative key from WebSocket ACCOUNT_UPDATE)
   positionInitialMargin: string;
   openOrderInitialMargin: string;
   leverage: string;
   isolated: boolean;
   entryPrice: string;
+  ep?: string; // Entry Price (alternative key from WebSocket ACCOUNT_UPDATE)
   maxNotional: string;
   positionSide: 'BOTH' | 'LONG' | 'SHORT';
+  ps?: 'BOTH' | 'LONG' | 'SHORT'; // Position Side (alternative key from WebSocket ACCOUNT_UPDATE)
   positionAmt: string;
+  pa?: string; // Position Amount (alternative key from WebSocket ACCOUNT_UPDATE)
   updateTime: number;
+  mt?: 'isolated' | 'cross'; // Margin Type from WebSocket
+  iw?: string; // Isolated Wallet from WebSocket
+  // Other fields from WebSocket ACCOUNT_UPDATE's "P" array might be relevant too
+  cr?: string; // (Pre-fee) Accumulated Realized from WebSocket
 }
+
 
 export interface AsterAccountInfoV2Asset {
   asset: string;
@@ -191,6 +218,70 @@ export interface AsterListenKey {
   listenKey: string;
 }
 
+// --- Aster WebSocket User Data Stream Event Payloads ---
+// (Simplified based on documentation examples)
+
+// For "e": "ACCOUNT_UPDATE"
+export interface AsterWebSocketUpdateAccountData {
+  m: string; // Event reason type (e.g., "ORDER", "FUNDING_FEE")
+  B: Partial<AsterAccountBalanceV2>[]; // Balances
+  P: Partial<AsterPositionV2>[]; // Positions
+}
+
+export interface AsterWebSocketUpdateAccount {
+  e: "ACCOUNT_UPDATE"; // Event Type
+  E: number; // Event Time
+  T: number; // Transaction Time
+  a: AsterWebSocketUpdateAccountData; // Update Data
+}
+
+// For "e": "ORDER_TRADE_UPDATE"
+export interface AsterWebSocketOrderUpdateData {
+  s: string; // Symbol
+  c: string; // Client Order Id
+  S: 'BUY' | 'SELL'; // Side
+  o: string; // Order Type
+  f: string; // Time in Force
+  q: string; // Original Quantity
+  p: string; // Original Price
+  ap: string; // Average Price
+  sp: string; // Stop Price
+  x: string; // Execution Type
+  X: string; // Order Status
+  i: number; // Order Id
+  l: string; // Order Last Filled Quantity
+  z: string; // Order Filled Accumulated Quantity
+  L: string; // Last Filled Price
+  N?: string; // Commission Asset
+  n?: string; // Commission
+  T: number; // Order Trade Time
+  t: number; // Trade Id
+  b: string; // Bids Notional
+  a: string; // Ask Notional
+  m: boolean; // Is this trade the maker side?
+  R: boolean; // Is this reduce only
+  wt: string; // Stop Price Working Type
+  ot: string; // Original Order Type
+  ps: 'BOTH' | 'LONG' | 'SHORT'; // Position Side
+  cp: boolean; // If Close-All
+  AP?: string; // Activation Price (for TRAILING_STOP_MARKET)
+  cr?: string; // Callback Rate (for TRAILING_STOP_MARKET)
+  rp: string; // Realized Profit of the trade
+}
+
+export interface AsterWebSocketUpdateOrder {
+  e: "ORDER_TRADE_UPDATE"; // Event Type
+  E: number; // Event Time
+  T: number; // Transaction Time
+  o: AsterWebSocketOrderUpdateData; // Order Data
+}
+
+export interface AsterWebSocketListenKeyExpired {
+  e: "listenKeyExpired";
+  E: number; // Event Time
+}
+
+
 // --- Unified/Comparison Types ---
 export interface ExchangeAssetDetail {
   id: string; 
@@ -208,7 +299,7 @@ export interface ExchangeAssetDetail {
   markPrice: number | null;
   indexPrice: number | null;
   oraclePrice?: number | null; 
-  exchange: 'Aster'; // Only Aster is supported now
+  exchange: 'Aster'; 
   iconUrl?: string; 
 }
 
@@ -219,8 +310,8 @@ export interface ExchangeAggregatedMetrics {
 }
 
 export interface ExchangeData {
-  name: 'Aster'; // Only Aster is supported now
-  metrics: ExchangeAggregatedMetrics;
+  name: 'Aster'; 
+  metrics: ExchangeAggregatedMetrics | null; // Can be null if data fails to load
   assets: ExchangeAssetDetail[];
 }
 
@@ -236,14 +327,10 @@ export interface AsterAccountSummaryData {
   totalUnrealizedPNL: number | null;
   totalRealizedPNL: number | null; 
   totalTrades: number | null; 
-  totalTradesLong?: number;
-  totalTradesShort?: number;
   totalVolume: number | null; 
-  totalVolumeLong?: number;
-  totalVolumeShort?: number;
   totalFeesPaid: number | null; 
-  commissionRateTaker: string | null; // Changed to string to match API
-  commissionRateMaker: string | null; // Changed to string to match API
+  commissionRateTaker: string | null; 
+  commissionRateMaker: string | null; 
   commissionSymbol: string | null;
   todayVolumeAuBoost: number | null;
   auTraderBoost: string | null; 
@@ -253,4 +340,7 @@ export interface AsterAccountSummaryData {
   positions?: AsterPositionV2[];
   userTrades?: AsterUserTrade[]; 
   webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
+  lastUpdated?: number; // Timestamp for localStorage caching
 }
+
+    
