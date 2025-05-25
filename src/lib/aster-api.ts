@@ -74,14 +74,16 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/openInterest?symbol=${symbol}`);
     if (!response.ok) {
-      if (response.status !== 400) { // 400 might be "Invalid symbol", which is expected for some
-         console.error(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
+      // Avoid console logging for 400 errors if it's just "Invalid symbol" as this can be noisy.
+      // Other errors (like rate limits or server issues) should still be logged.
+      if (response.status !== 400) { 
+         console.warn(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
       }
       return null;
     }
     return await response.json();
   } catch (error) {
-    console.error(`Failed to fetch Aster open interest for ${symbol}:`, error);
+    console.warn(`Failed to fetch Aster open interest for ${symbol}:`, error);
     return null;
   }
 }
@@ -109,7 +111,7 @@ export async function fetchAsterOrderBook(symbol: string, limit: 5 | 10 | 20 | 5
       console.error(`Aster API error (depth for ${symbol}): ${response.status} ${errorBody}`);
       try {
         const errorJson = JSON.parse(errorBody);
-        if (errorJson && errorJson.code === -4021) {
+        if (errorJson && errorJson.code === -4021) { // Specific error code for invalid depth limit
             console.error(`Specific Aster API error: Invalid depth limit used for symbol ${symbol}. Attempted limit: ${limit}. Valid limits: [5, 10, 20, 50, 100, 500, 1000]`);
         }
       } catch(e) {/* ignore json parse error if body is not json */}
@@ -124,10 +126,21 @@ export async function fetchAsterOrderBook(symbol: string, limit: 5 | 10 | 20 | 5
 
 
 export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics, assets: ExchangeAssetDetail[] }> {
-  const symbolsInfo = await fetchAsterExchangeInfo();
-  const allTickers = await fetchAsterAllTickers24hr();
-  const allPremiumIndices = await fetchAsterAllPremiumIndex();
+  const symbolsInfoPromise = fetchAsterExchangeInfo();
+  const allTickersPromise = fetchAsterAllTickers24hr();
+  const allPremiumIndicesPromise = fetchAsterAllPremiumIndex();
 
+  const [symbolsInfo, allTickers, allPremiumIndices] = await Promise.all([
+    symbolsInfoPromise,
+    allTickersPromise,
+    allPremiumIndicesPromise,
+  ]);
+
+  if (!symbolsInfo || symbolsInfo.length === 0 || !allTickers || allTickers.length === 0) {
+    console.warn("AsterDex: Failed to fetch critical initial data (symbols or tickers). Returning empty.");
+    return { metrics: { totalDailyVolume: 0, totalOpenInterest: 0, totalDailyTrades: 0 }, assets: [] };
+  }
+  
   let totalDailyVolume = 0;
   let totalOpenInterest = 0;
   let totalDailyTrades = 0;
@@ -139,21 +152,33 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
   const premiumIndexMap = new Map<string, AsterPremiumIndex>();
   allPremiumIndices.forEach(pi => premiumIndexMap.set(pi.symbol, pi));
 
+  // Sort tickers by quoteVolume to fetch OI for top N symbols first
+  const sortedTickersForOI = [...allTickers]
+    .sort((a, b) => (parseFloatSafe(b.quoteVolume) ?? 0) - (parseFloatSafe(a.quoteVolume) ?? 0))
+    .slice(0, 20); // Fetch OI for top 20 symbols by volume
+
+  const openInterestDataMap = new Map<string, AsterOpenInterest | null>();
+
+  for (const ticker of sortedTickersForOI) {
+    // Add a small delay to be extremely cautious with rate limits, even for a smaller loop.
+    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay as we loop fewer times
+    const oiData = await fetchAsterOpenInterest(ticker.symbol);
+    openInterestDataMap.set(ticker.symbol, oiData);
+  }
+
   for (const symbolInfo of symbolsInfo) {
     const ticker = tickerMap.get(symbolInfo.symbol);
-    if (!ticker) continue; 
+    if (!ticker) continue; // Skip if no ticker data for this symbol
 
     const price = parseFloatSafe(ticker.lastPrice) ?? 0;
-    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume) ?? 0; 
+    const dailyVolumeQuote = parseFloatSafe(ticker.quoteVolume) ?? 0;
     const dailyTrades = parseIntSafe(ticker.count) ?? 0;
 
     totalDailyVolume += dailyVolumeQuote;
     totalDailyTrades += dailyTrades;
     
     let openInterestValue = 0;
-    // Add a delay before fetching OI to respect rate limits.
-    await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay
-    const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
+    const oiData = openInterestDataMap.get(symbolInfo.symbol); // Get pre-fetched OI if available
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest) ?? 0;
       openInterestValue = oiBase * price; 
@@ -168,7 +193,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       price: price,
       dailyVolume: dailyVolumeQuote,
       baseAssetVolume24h: parseFloatSafe(ticker.volume),
-      openInterest: openInterestValue,
+      openInterest: openInterestDataMap.has(symbolInfo.symbol) ? openInterestValue : null, // Set to null if OI wasn't fetched
       dailyTrades: dailyTrades,
       fundingRate: premiumIndex ? parseFloatSafe(premiumIndex.lastFundingRate, true) : null,
       nextFundingTime: premiumIndex ? premiumIndex.nextFundingTime : null,
@@ -177,18 +202,20 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       low24h: parseFloatSafe(ticker.lowPrice, true),
       markPrice: premiumIndex ? parseFloatSafe(premiumIndex.markPrice, true) : null,
       indexPrice: premiumIndex ? parseFloatSafe(premiumIndex.indexPrice, true) : null,
+      oraclePrice: null, // Aster doesn't provide oraclePrice in these endpoints
       exchange: 'Aster',
-      iconUrl: `https://placehold.co/32x32.png?text=${symbolInfo.baseAsset.substring(0,3)}`,
+      iconUrl: `https://s3-ap-northeast-1.amazonaws.com/file.fmex.com/imgs/coin_new/${symbolInfo.baseAsset.toLowerCase()}.png`, // Example dynamic icon URL pattern
     });
   }
   
   return {
     metrics: {
       totalDailyVolume,
-      totalOpenInterest,
+      totalOpenInterest, // Now based on top N symbols
       totalDailyTrades,
     },
     assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
 
+    
