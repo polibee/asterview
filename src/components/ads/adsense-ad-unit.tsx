@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface AdSenseAdUnitProps extends React.HTMLAttributes<HTMLModElement> {
   adClient: string; // e.g., "ca-pub-YOUR_PUBLISHER_ID"
@@ -27,19 +27,27 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
   style,
   ...props
 }) => {
+  const pushedOnce = useRef(false);
+
   useEffect(() => {
-    if (adSlotId && adClient) {
+    if (pushedOnce.current) {
+      return;
+    }
+
+    if (adSlotId && adClient && !adSlotId.startsWith("YOUR_") && !adClient.startsWith("ca-pub-YOUR_")) {
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
+        pushedOnce.current = true;
       } catch (e) {
-        console.error("AdSense push error:", e);
+        console.error(`AdSense push error for slot ${adSlotId}:`, e);
       }
     }
-  }, [adSlotId, adClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
     // Do not render if slot or client ID is missing or is a placeholder
-    return null; 
+    return null;
   }
 
   return (
@@ -61,6 +69,7 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
         data-ad-slot={adSlotId}
         data-ad-format={adFormat}
         data-full-width-responsive={responsive.toString()}
+        key={adSlotId} // Add key to the <ins> tag
       ></ins>
     </div>
   );
