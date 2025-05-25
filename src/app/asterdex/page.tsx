@@ -3,8 +3,8 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { getAsterProcessedData } from '@/lib/aster-api';
 import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookEntry } from '@/types';
+import { getAsterProcessedData } from '@/lib/aster-api';
 import { AssetDataTable } from '@/components/asset-data-table';
 import { OrderBookDisplay } from '@/components/order-book-display';
 import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
@@ -20,7 +20,7 @@ const MID_PAGE_AD_SLOT_ID_ASTERDEX = "YOUR_MID_PAGE_AD_SLOT_ID_ASTERDEX";
 const FOOTER_AD_SLOT_ID_ASTERDEX = "YOUR_FOOTER_AD_SLOT_ID_ASTERDEX";
 
 interface AsterOrderBookWebSocketMessage {
-  e: "depthUpdate"; // Event type
+  e: "depthUpdate"; // Event type for diffs, snapshots might not have 'e' if directly the book data
   E: number; // Event time
   T: number; // Transaction time
   s: string; // Symbol
@@ -40,11 +40,12 @@ export default function AsterDexPage() {
   const [isLoadingOrderBook, setIsLoadingOrderBook] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
   const orderBookWsRef = useRef<WebSocket | null>(null);
+  // Added comment to potentially help with HMR if it was stuck
 
   useEffect(() => {
     async function loadInitialData() {
       setIsLoadingPageData(true);
-      setPageError(null);
+      setPageError(null); 
 
       try {
         const processedData = await getAsterProcessedData();
@@ -56,20 +57,20 @@ export default function AsterDexPage() {
              console.warn("AsterDex: No assets returned from getAsterProcessedData.");
           }
         } else {
-           console.warn("Failed to load critical AsterDex data in page component.");
+           console.error("Failed to load critical AsterDex data in page component.");
            setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-           setExchangeData({ assets: [] });
+           setExchangeData({ assets: [] }); 
         }
       } catch (error: any) {
         console.error("Error loading initial AsterDex page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] });
+        setExchangeData({ assets: [] }); 
       } finally {
         setIsLoadingPageData(false);
       }
     }
     loadInitialData();
-  }, []);
+  }, []); 
 
   useEffect(() => {
     if (pageError || !selectedSymbolForOrderBook) {
@@ -83,30 +84,40 @@ export default function AsterDexPage() {
     }
 
     setIsLoadingOrderBook(true);
-    setOrderBook(null); // Clear previous order book data
+    setOrderBook(null); 
 
-    // Close existing WebSocket connection if any
     if (orderBookWsRef.current) {
       orderBookWsRef.current.close();
     }
 
+    // Using @depth20@100ms for a balance of detail and update frequency
     const wsUrl = `wss://fstream.asterdex.com/ws/${selectedSymbolForOrderBook.toLowerCase()}@depth20@100ms`;
     const newWs = new WebSocket(wsUrl);
     orderBookWsRef.current = newWs;
 
     newWs.onopen = () => {
       console.log(`AsterDex OrderBook WebSocket connected for ${selectedSymbolForOrderBook}`);
-      // isLoadingOrderBook will be set to false on first message
     };
 
     newWs.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data as string) as AsterOrderBookWebSocketMessage;
-        if (data.e === 'depthUpdate') {
+        // The `@depth<levels>@<speed>` stream sends snapshots directly.
+        // The structure directly gives bids (b) and asks (a).
+        if (data.b && data.a) { 
           setOrderBook({
             bids: data.b,
             asks: data.a,
-            lastUpdateId: data.u, // or data.U, depending on what's needed
+            lastUpdateId: data.u, 
+            E: data.E,
+            T: data.T,
+          });
+          if (isLoadingOrderBook) setIsLoadingOrderBook(false);
+        } else if (data.e === 'depthUpdate') { // Fallback for general depthUpdate event structure (less likely for snapshot stream)
+           setOrderBook({
+            bids: data.b,
+            asks: data.a,
+            lastUpdateId: data.u,
             E: data.E,
             T: data.T,
           });
@@ -118,18 +129,16 @@ export default function AsterDexPage() {
     };
 
     newWs.onerror = (error) => {
-      console.error(`AsterDex OrderBook WebSocket error for ${selectedSymbolForOrderBook}:`, error);
+      console.warn(`AsterDex OrderBook WebSocket error for ${selectedSymbolForOrderBook}:`, error);
       setIsLoadingOrderBook(false);
-      setOrderBook(null); // Clear order book on error
-      // Optionally set an error state specific to the order book
+      setOrderBook(null); 
     };
 
     newWs.onclose = (event) => {
       console.log(`AsterDex OrderBook WebSocket disconnected for ${selectedSymbolForOrderBook}. Code: ${event.code}, Reason: ${event.reason}`);
-      if (orderBookWsRef.current === newWs) { // Avoid issues if a new WS was created before this onclose triggered
+      if (orderBookWsRef.current === newWs) { 
         orderBookWsRef.current = null;
       }
-      // Don't set isLoadingOrderBook to true here, allow re-selection to trigger loading
     };
 
     return () => {
@@ -140,7 +149,7 @@ export default function AsterDexPage() {
         }
       }
     };
-  }, [selectedSymbolForOrderBook, pageError, isLoadingOrderBook]); // isLoadingOrderBook added to ensure first message sets it false.
+  }, [selectedSymbolForOrderBook, pageError]); 
 
   const availableSymbolsForOrderBook = React.useMemo(() => {
     return exchangeData.assets?.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
@@ -156,9 +165,9 @@ export default function AsterDexPage() {
             AsterDex Exchange
           </h1>
         </header>
-        <Skeleton className="h-64 w-full mb-6 rounded-lg" /> {/* Skeleton for Account Center */}
-        <Skeleton className="h-[400px] w-full mb-6 rounded-lg" /> {/* Skeleton for Order Book */}
-        <Skeleton className="h-96 w-full rounded-lg" /> {/* Skeleton for Asset Table */}
+        <Skeleton className="h-64 w-full mb-6 rounded-lg" /> 
+        <Skeleton className="h-[400px] w-full mb-6 rounded-lg" /> 
+        <Skeleton className="h-96 w-full rounded-lg" /> 
       </div>
     );
   }
@@ -194,12 +203,11 @@ export default function AsterDexPage() {
         <AsterdexAccountCenter />
       </section>
       
-      {/* Mid-Page Ad Placeholder */}
       <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={MID_PAGE_AD_SLOT_ID_ASTERDEX} className="my-8" />
 
       <section>
         <div className="flex flex-col md:flex-row gap-8">
-            <div className="flex-grow md:w-1/2">
+            <div className="flex-grow md:w-full"> {/* Changed to full width for better display on medium screens */}
                 <h2 className="text-xl font-semibold tracking-tight mt-8 mb-3 flex items-center gap-2">
                     <BookOpen className="h-5 w-5 text-primary" />
                     Order Book
@@ -214,8 +222,6 @@ export default function AsterDexPage() {
                   isLoading={isLoadingOrderBook}
                 />
             </div>
-            {/* Placeholder for other content or keep as is if only order book is needed here */}
-            {/* <div className="flex-grow md:w-1/2"> ... other content ... </div> */}
         </div>
       </section>
 
@@ -238,7 +244,6 @@ export default function AsterDexPage() {
         )}
       </section>
 
-      {/* Footer Ad Placeholder */}
       <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={FOOTER_AD_SLOT_ID_ASTERDEX} className="my-8" />
 
       <footer className="text-center py-6 text-sm text-muted-foreground mt-10 border-t">
@@ -247,3 +252,4 @@ export default function AsterDexPage() {
     </div>
   );
 }
+
