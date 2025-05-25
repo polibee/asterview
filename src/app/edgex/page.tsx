@@ -29,23 +29,21 @@ export default function EdgeXPage() {
       setPageError(null);
       try {
         const processedData = await getEdgeXProcessedData();
-        // Check if metrics is null (indicating a critical failure like missing metadata)
-        // or if assets array is present (even if empty, it means metadata was likely fetched)
+        
         if (processedData && processedData.metrics && processedData.assets) {
           setExchangeData({ assets: processedData.assets });
           if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
             setSelectedContractForOrderBook(processedData.assets[0].id);
           } else if (processedData.assets.length === 0 && processedData.metrics) {
-            // Metadata might be fine, but no tradable assets returned. Not necessarily a page error yet.
             setExchangeData({ assets: [] });
           }
         } else {
-           // This means getEdgeXProcessedData indicated a critical failure (e.g. by returning metrics: null)
-          console.error("Failed to load critical EdgeX data in page component.");
+          // This means getEdgeXProcessedData indicated a critical failure (e.g. by returning metrics: null)
+          console.warn("Failed to load critical EdgeX data in page component."); // Changed from console.error
           setPageError("Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
           setExchangeData({ assets: [] });
         }
-      } catch (error: any) { // Catch any unexpected errors from getEdgeXProcessedData
+      } catch (error: any) { 
         console.error("Error loading initial EdgeX page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The EdgeX API might be temporarily unavailable or experiencing issues.");
         setExchangeData({ assets: [] }); 
@@ -182,10 +180,22 @@ export default function EdgeXPage() {
 
       <section>
         <h2 className="text-2xl font-semibold tracking-tight mb-4">Asset Details</h2>
-        <AssetDataTable 
-          initialAssets={exchangeData?.assets ?? []} 
-          exchangeName="EdgeX" 
-        />
+        {pageError && !isLoadingPageData && (
+            <Card className="shadow-lg rounded-lg border-destructive my-4">
+            <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+                <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+                <h2 className="text-xl font-semibold text-destructive mb-2">Error Fetching Asset Details</h2>
+                <p className="text-muted-foreground">{pageError}</p>
+                <p className="text-sm text-muted-foreground mt-2">Asset details could not be loaded.</p>
+            </CardContent>
+            </Card>
+        )}
+        {!pageError && (
+            <AssetDataTable 
+              initialAssets={exchangeData?.assets ?? []} 
+              exchangeName="EdgeX" 
+            />
+        )}
       </section>
 
       <footer className="text-center py-6 text-sm text-muted-foreground mt-10 border-t">
@@ -194,3 +204,4 @@ export default function EdgeXPage() {
     </div>
   );
 }
+
