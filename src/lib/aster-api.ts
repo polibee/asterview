@@ -1,10 +1,10 @@
 
-import type { AsterTicker24hr, AsterOpenInterest, AsterExchangeInfo, ExchangeAssetDetail, ExchangeAggregatedMetrics, AsterExchangeSymbol, AsterOrderBookData, AsterPremiumIndex } from '@/types';
+import type { AsterTicker24hr, AsterOpenInterest, AsterExchangeInfo, ExchangeAssetDetail, ExchangeAggregatedMetrics, AsterExchangeSymbol, AsterOrderBookData, AsterPremiumIndex, AsterServerTime } from '@/types';
 
 const ASTER_API_BASE_URL = 'https://fapi.asterdex.com/fapi/v1';
 
 // Helper to safely parse numbers, returning 0 if NaN or invalid, or null if specified
-const parseFloatSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+const parseFloatSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
   if (value === undefined || value === null || String(value).trim() === '') {
     return returnNullOnNaN ? null : 0;
   }
@@ -15,7 +15,7 @@ const parseFloatSafe = (value: string | number | undefined, returnNullOnNaN = fa
   return num;
 };
 
-const parseIntSafe = (value: string | number | undefined, returnNullOnNaN = false): number | null => {
+const parseIntSafe = (value: string | number | undefined | null, returnNullOnNaN = false): number | null => {
   if (value === undefined || value === null || String(value).trim() === '') {
     return returnNullOnNaN ? null : 0;
   }
@@ -24,6 +24,21 @@ const parseIntSafe = (value: string | number | undefined, returnNullOnNaN = fals
     return returnNullOnNaN ? null : 0;
   }
   return num;
+}
+
+export async function fetchAsterServerTime(): Promise<AsterServerTime> {
+  try {
+    const response = await fetch(`${ASTER_API_BASE_URL}/time`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Aster API error (serverTime): ${response.status} ${errorText}`);
+      throw new Error(`Failed to fetch Aster server time: ${response.status} ${errorText.substring(0,100)}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Network or other error fetching Aster server time:', error);
+    throw error;
+  }
 }
 
 export async function fetchAsterExchangeInfo(): Promise<AsterExchangeSymbol[]> {
@@ -59,7 +74,7 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/openInterest?symbol=${symbol}`);
     if (!response.ok) {
-      if (response.status !== 400) { 
+      if (response.status !== 400) { // 400 might be "Invalid symbol", which is expected for some
          console.error(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
       }
       return null;
@@ -86,17 +101,18 @@ export async function fetchAsterAllPremiumIndex(): Promise<AsterPremiumIndex[]> 
 }
 
 // Valid limits for AsterDex Order Book: [5, 10, 20, 50, 100, 500, 1000]
-// Using 20 as a default, which seems reasonable for UI display.
 export async function fetchAsterOrderBook(symbol: string, limit: 5 | 10 | 20 | 50 | 100 | 500 | 1000 = 20): Promise<AsterOrderBookData | null> {
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/depth?symbol=${symbol}&limit=${limit}`);
     if (!response.ok) {
       const errorBody = await response.text();
       console.error(`Aster API error (depth for ${symbol}): ${response.status} ${errorBody}`);
-      // Check for specific error code -4021 (invalid depth limit) for better debugging
-      if (errorBody.includes("-4021")) {
-          console.error(`Specific Aster API error: Invalid depth limit used for symbol ${symbol}. Attempted limit: ${limit}. Valid limits: [5, 10, 20, 50, 100, 500, 1000]`);
-      }
+      try {
+        const errorJson = JSON.parse(errorBody);
+        if (errorJson && errorJson.code === -4021) {
+            console.error(`Specific Aster API error: Invalid depth limit used for symbol ${symbol}. Attempted limit: ${limit}. Valid limits: [5, 10, 20, 50, 100, 500, 1000]`);
+        }
+      } catch(e) {/* ignore json parse error if body is not json */}
       return null;
     }
     return await response.json();
@@ -136,7 +152,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     
     let openInterestValue = 0;
     // Add a delay before fetching OI to respect rate limits.
-    await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
+    await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay
     const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest) ?? 0;

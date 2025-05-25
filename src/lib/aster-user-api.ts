@@ -1,10 +1,5 @@
 
 // src/lib/aster-user-api.ts
-// REMOVED: 'use server'; 
-// IMPORTANT: These functions will now run in the user's browser.
-// This requires the AsterDex API (fapi.asterdex.com) to have CORS headers
-// configured to allow requests from your application's domain for authenticated endpoints.
-// If CORS is not configured correctly on their side, these requests will fail.
 
 import type {
   AsterAccountBalanceV2,
@@ -26,15 +21,20 @@ async function makeAsterAuthenticatedRequest<T>(
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   apiKey: string,
   secretKey: string,
-  params?: Record<string, any>
+  params?: Record<string, any>,
+  serverTimeOffset?: number // Optional server time offset
 ): Promise<T> {
   if (!apiKey || !secretKey) {
     console.error('API key or secret key is missing for authenticated request to', endpoint);
     throw new Error('API Key or Secret Key is not configured.');
   }
 
-  const timestamp = Date.now();
-  const queryParams = { ...params, timestamp, recvWindow: 5000 }; // recvWindow is important
+  const currentClientTime = Date.now();
+  const requestTimestamp = serverTimeOffset !== undefined 
+    ? currentClientTime + serverTimeOffset 
+    : currentClientTime;
+
+  const queryParams = { ...params, timestamp: requestTimestamp, recvWindow: 5000 };
 
   const queryString = Object.entries(queryParams)
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
@@ -45,7 +45,7 @@ async function makeAsterAuthenticatedRequest<T>(
 
   const headers = new Headers();
   headers.append('X-MBX-APIKEY', apiKey);
-  if (method === 'POST' || method === 'PUT' || method === 'DELETE') { // DELETE might also need this
+  if (method === 'POST' || method === 'PUT' || method === 'DELETE') {
     headers.append('Content-Type', 'application/x-www-form-urlencoded');
   }
 
@@ -68,15 +68,12 @@ async function makeAsterAuthenticatedRequest<T>(
       } catch (e) {
         // Ignore parsing error if body isn't JSON, use the raw text
       }
-      // Log the more detailed error that includes the response body text.
-      console.error(`Aster User API request to ${endpoint} failed with status ${response.status}. Body: ${responseBodyText}`);
+      console.error(`Aster User API request to ${endpoint} failed. Status: ${response.status}. URL: ${url.replace(secretKey, '***SECRET***')}. Response: ${responseBodyText}`);
       throw new Error(apiErrorMessage);
     }
     
-    // Handle potentially empty successful responses (e.g., for PUT/DELETE on listenKey)
     if (responseBodyText.trim() === '' || responseBodyText.trim() === '{}') {
         if (response.status === 200 && (method === 'PUT' || method === 'DELETE')) {
-             // For PUT/DELETE listenKey, an empty JSON object {} is a success.
             return {} as T;
         }
     }
@@ -89,39 +86,37 @@ async function makeAsterAuthenticatedRequest<T>(
     }
 
   } catch (error: any) {
-    // This catch block handles errors from the fetch() call itself (e.g., network issues)
-    // or errors re-thrown from the !response.ok block, or JSON parsing errors.
-    if (error instanceof TypeError && error.message === "Failed to fetch") {
-      // Network error (e.g., CORS, DNS, server unreachable)
-      console.warn(`Network error or CORS issue fetching Aster User API (${endpoint} - ${method}): ${error.message}. Ensure AsterDex API allows requests from this origin.`);
-      throw new Error(`Network error or CORS issue communicating with AsterDex API: ${error.message}. Please check browser console for details.`);
+    if (error.message.includes("Failed to fetch")) {
+      console.warn(`Network error or CORS issue fetching Aster User API (${endpoint} - ${method}): ${error.message}. Ensure AsterDex API allows requests from this origin if running client-side.`);
+      throw new Error(`Network error or CORS issue: ${error.message}. Check browser console and network tab for details.`);
     } else if (!(error.message.startsWith("Aster API Error") || error.message.startsWith("Failed to parse API response") || error.message.startsWith("Network error or CORS issue"))) {
         console.error(`Unexpected error during Aster User API request to ${endpoint} (${method}):`, error);
     }
-    throw error; // Re-throw the error to be handled by the calling component
+    throw error; 
   }
 }
 
-export async function fetchAsterAccountBalances(apiKey: string, secretKey: string): Promise<AsterAccountBalanceV2[]> {
-  return makeAsterAuthenticatedRequest<AsterAccountBalanceV2[]>(`${ASTER_API_V2_BASE_URL}/balance`, 'GET', apiKey, secretKey);
+export async function fetchAsterAccountBalances(apiKey: string, secretKey: string, serverTimeOffset?: number): Promise<AsterAccountBalanceV2[]> {
+  return makeAsterAuthenticatedRequest<AsterAccountBalanceV2[]>(`${ASTER_API_V2_BASE_URL}/balance`, 'GET', apiKey, secretKey, undefined, serverTimeOffset);
 }
 
-export async function fetchAsterAccountInfo(apiKey: string, secretKey: string): Promise<AsterAccountInfoV2> {
-  return makeAsterAuthenticatedRequest<AsterAccountInfoV2>(`${ASTER_API_V2_BASE_URL}/account`, 'GET', apiKey, secretKey);
+export async function fetchAsterAccountInfo(apiKey: string, secretKey: string, serverTimeOffset?: number): Promise<AsterAccountInfoV2> {
+  return makeAsterAuthenticatedRequest<AsterAccountInfoV2>(`${ASTER_API_V2_BASE_URL}/account`, 'GET', apiKey, secretKey, undefined, serverTimeOffset);
 }
 
-export async function fetchAsterPositions(apiKey: string, secretKey: string, symbol?: string): Promise<AsterPositionV2[]> {
+export async function fetchAsterPositions(apiKey: string, secretKey: string, serverTimeOffset?: number, symbol?: string): Promise<AsterPositionV2[]> {
   const params: Record<string, any> = {};
   if (symbol) {
     params.symbol = symbol;
   }
-  return makeAsterAuthenticatedRequest<AsterPositionV2[]>(`${ASTER_API_V2_BASE_URL}/positionRisk`, 'GET', apiKey, secretKey, params);
+  return makeAsterAuthenticatedRequest<AsterPositionV2[]>(`${ASTER_API_V2_BASE_URL}/positionRisk`, 'GET', apiKey, secretKey, params, serverTimeOffset);
 }
 
 export async function fetchAsterUserTrades(
   apiKey: string,
   secretKey: string,
   symbol: string,
+  serverTimeOffset?: number,
   limit: number = 500,
   fromId?: number,
   startTime?: number,
@@ -132,16 +127,17 @@ export async function fetchAsterUserTrades(
   if (startTime !== undefined) params.startTime = startTime;
   if (endTime !== undefined) params.endTime = endTime;
 
-  return makeAsterAuthenticatedRequest<AsterUserTrade[]>(`${ASTER_API_BASE_URL}/userTrades`, 'GET', apiKey, secretKey, params);
+  return makeAsterAuthenticatedRequest<AsterUserTrade[]>(`${ASTER_API_BASE_URL}/userTrades`, 'GET', apiKey, secretKey, params, serverTimeOffset);
 }
 
-export async function fetchAsterCommissionRate(apiKey: string, secretKey: string, symbol: string): Promise<AsterCommissionRate> {
-   return makeAsterAuthenticatedRequest<AsterCommissionRate>(`${ASTER_API_BASE_URL}/commissionRate`, 'GET', apiKey, secretKey, { symbol });
+export async function fetchAsterCommissionRate(apiKey: string, secretKey: string, symbol: string, serverTimeOffset?: number): Promise<AsterCommissionRate> {
+   return makeAsterAuthenticatedRequest<AsterCommissionRate>(`${ASTER_API_BASE_URL}/commissionRate`, 'GET', apiKey, secretKey, { symbol }, serverTimeOffset);
 }
 
 export async function fetchAsterIncomeHistory(
     apiKey: string,
     secretKey: string,
+    serverTimeOffset?: number,
     incomeType?: "TRANSFER" | "WELCOME_BONUS" | "REALIZED_PNL" | "FUNDING_FEE" | "COMMISSION" | "INSURANCE_CLEAR" | "MARKET_MERCHANT_RETURN_REWARD" | string,
     symbol?: string,
     startTime?: number,
@@ -154,13 +150,10 @@ export async function fetchAsterIncomeHistory(
     if (startTime) params.startTime = startTime;
     if (endTime) params.endTime = endTime;
 
-    return makeAsterAuthenticatedRequest<AsterIncomeHistoryItem[]>(`${ASTER_API_BASE_URL}/income`, 'GET', apiKey, secretKey, params);
+    return makeAsterAuthenticatedRequest<AsterIncomeHistoryItem[]>(`${ASTER_API_BASE_URL}/income`, 'GET', apiKey, secretKey, params, serverTimeOffset);
 }
 
 
-// --- Listen Key for WebSocket ---
-// These also become client-side. Note: ListenKey management directly from the client
-// means the API key is exposed in these non-signed requests too.
 export async function createAsterListenKey(apiKey: string): Promise<AsterListenKey> {
   if (!apiKey) {
     console.error('API key is missing for creating listen key.');
@@ -187,7 +180,7 @@ export async function createAsterListenKey(apiKey: string): Promise<AsterListenK
   }
 }
 
-export async function keepAliveAsterListenKey(apiKey: string, listenKeyToUse: string): Promise<Record<string, unknown>> {
+export async function keepAliveAsterListenKey(apiKey: string): Promise<Record<string, unknown>> {
   if (!apiKey) {
     console.error('API key is missing for keepAlive.');
     throw new Error('API key is missing for keepAlive.');
@@ -196,17 +189,16 @@ export async function keepAliveAsterListenKey(apiKey: string, listenKeyToUse: st
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'PUT',
       headers: { 'X-MBX-APIKEY': apiKey },
-       // Body for PUT listenKey is just listenKey=<theKey> but it's actually just managed by API Key
     });
     const responseBodyText = await response.text();
     if (!response.ok) {
-      console.error(`Aster ListenKey keepAlive error for key (status ${response.status}): ${responseBodyText}`);
+      console.error(`Aster ListenKey keepAlive error (status ${response.status}): ${responseBodyText}`);
       throw new Error(`ListenKey keepAlive failed (status ${response.status}): ${responseBodyText.substring(0,100)}`);
     }
     if (responseBodyText.trim() === '{}' || responseBodyText.trim() === '') {
-        return {}; // Success with empty body
+        return {}; 
     }
-    return JSON.parse(responseBodyText); // Success usually returns {}
+    return JSON.parse(responseBodyText) as Record<string, unknown>;
   } catch (error: any) {
      if (error instanceof TypeError && error.message === "Failed to fetch") {
       console.warn(`Network error or CORS issue keeping alive Aster ListenKey: ${error.message}.`);
@@ -217,7 +209,7 @@ export async function keepAliveAsterListenKey(apiKey: string, listenKeyToUse: st
   }
 }
 
-export async function deleteAsterListenKey(apiKey: string, listenKeyToUse: string): Promise<Record<string, unknown>> {
+export async function deleteAsterListenKey(apiKey: string): Promise<Record<string, unknown>> {
    if (!apiKey) {
     console.error('API key is missing for delete.');
     throw new Error('API key is missing for delete.');
@@ -226,17 +218,16 @@ export async function deleteAsterListenKey(apiKey: string, listenKeyToUse: strin
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'DELETE',
       headers: { 'X-MBX-APIKEY': apiKey },
-      // Body for DELETE listenKey is just listenKey=<theKey> but it's actually just managed by API Key
     });
     const responseBodyText = await response.text();
      if (!response.ok) {
-      console.error(`Aster ListenKey delete error for key (status ${response.status}): ${responseBodyText}`);
+      console.error(`Aster ListenKey delete error (status ${response.status}): ${responseBodyText}`);
       throw new Error(`ListenKey delete failed (status ${response.status}): ${responseBodyText.substring(0,100)}`);
     }
-    if (responseBodyText.trim() === '{}' || responseBodyText.trim() === '') {
-        return {}; // Success with empty body
+     if (responseBodyText.trim() === '{}' || responseBodyText.trim() === '') {
+        return {};
     }
-    return JSON.parse(responseBodyText); // Success usually returns {}
+    return JSON.parse(responseBodyText)  as Record<string, unknown>;
   } catch (error:any) {
      if (error instanceof TypeError && error.message === "Failed to fetch") {
       console.warn(`Network error or CORS issue deleting Aster ListenKey: ${error.message}.`);
@@ -246,4 +237,3 @@ export async function deleteAsterListenKey(apiKey: string, listenKeyToUse: strin
     throw new Error(`Failed to delete Aster ListenKey: ${error.message}`);
   }
 }
-

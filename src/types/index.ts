@@ -1,4 +1,5 @@
 
+// src/types/index.ts
 
 export interface MarketData {
   id: string;
@@ -22,6 +23,10 @@ export interface GlobalMetrics {
 }
 
 // --- Aster API Types ---
+export interface AsterServerTime {
+  serverTime: number;
+}
+
 export interface AsterTicker24hr {
   symbol: string;
   priceChange: string;
@@ -107,6 +112,19 @@ export interface AsterOrderBookData {
   asks: AsterOrderBookEntry[];
 }
 
+export interface AsterOrderBookWebSocketMessage {
+  e: 'depthUpdate'; // Event type for order book updates
+  E: number;        // Event time
+  T: number;        // Transaction time
+  s: string;        // Symbol
+  U: number;        // First update ID in event
+  u: number;        // Final update ID in event
+  pu: number;       // Final update ID in last stream (for diff stream, not used in snapshot)
+  b: AsterOrderBookEntry[]; // Bids to be updated
+  a: AsterOrderBookEntry[]; // Asks to be updated
+}
+
+
 // --- Aster User API Types ---
 export interface AsterAccountBalanceV2 {
   accountAlias: string;
@@ -146,8 +164,8 @@ export interface AsterPositionV2 {
   mt?: 'isolated' | 'cross'; 
   iw?: string; 
   cr?: string; 
-  marginType?: "isolated" | "cross";
-  isAutoAddMargin?: "true" | "false";
+  marginType?: "isolated" | "cross" | string; // string to be more flexible
+  isAutoAddMargin?: "true" | "false" | string;
   isolatedMargin?: string;
   liquidationPrice?: string;
   markPrice?: string;
@@ -274,9 +292,9 @@ export interface ExchangeAssetDetail {
   id: string;
   symbol: string;
   price: number;
-  dailyVolume: number;
+  dailyVolume: number; // Quote asset volume
   baseAssetVolume24h?: number; 
-  openInterest: number;
+  openInterest: number; // Quote asset volume
   dailyTrades: number;
   fundingRate: number | null;
   nextFundingTime: number | null;
@@ -317,17 +335,17 @@ export interface AsterAccountSummaryData {
   totalVolume: number; 
   longVolume: number; 
   shortVolume: number; 
-  totalFeesPaid: number; 
-  latestFee: number | null;
+  totalFeesPaid: number; // Sum of commissions from TRADES (for latestFee display logic)
+  latestFee: number | null; // Latest single trade commission
   commissionRateTaker: string | null;
   commissionRateMaker: string | null;
   commissionSymbol: string | null;
   previousDayVolumeAuBoost: number; 
   auTraderBoost: string | null; 
   rhPointsTotal: number;
-  todayTotalVolume: number;
-  totalFundingFees: number;
-  totalCommissions: number; // Specifically from income history
+  todayTotalVolume: number; // Current UTC day's volume
+  totalFundingFees: number; // Sum of FUNDING_FEE from income history
+  totalCommissions: number; // Sum of COMMISSION from income history
   balances?: AsterAccountBalanceV2[];
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
