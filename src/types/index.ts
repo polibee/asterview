@@ -1,5 +1,4 @@
 
-
 export interface MarketData {
   id: string;
   symbol: string; // e.g., "BTC/USD"
@@ -273,7 +272,7 @@ export interface ExchangeAssetDetail {
   low24h: number | null;
   markPrice: number | null;
   indexPrice: number | null;
-  oraclePrice?: number | null; // From EdgeX, not typically primary display but good to have
+  oraclePrice?: number | null; 
   exchange: 'Aster';
   iconUrl?: string;
 }
@@ -298,25 +297,25 @@ export type UnifiedOrderBookEntry = {
 export interface AsterAccountSummaryData {
   portfolioValue: number | null;
   totalUnrealizedPNL: number | null;
-  totalRealizedPNL: number | null; // Will be 0 if no trades
-  totalTrades: number | null; // Will be 0 if no trades
-  longTrades: number | null; // Will be 0 if no trades
-  shortTrades: number | null; // Will be 0 if no trades
-  totalVolume: number | null; // Will be 0 if no trades
-  longVolume: number | null; // Will be 0 if no trades
-  shortVolume: number | null; // Will be 0 if no trades
-  totalFeesPaid: number | null; // Will be 0 if no trades
+  totalRealizedPNL: number; 
+  totalTrades: number; 
+  longTrades: number; 
+  shortTrades: number; 
+  totalVolume: number; 
+  longVolume: number; 
+  shortVolume: number; 
+  totalFeesPaid: number; 
   latestFee: number | null;
   commissionRateTaker: string | null;
   commissionRateMaker: string | null;
   commissionSymbol: string | null;
-  previousDayVolumeAuBoost: number | null; // Renamed from todayVolumeAuBoost, will be 0
-  auTraderBoost: string | null; // Will be "1x (Base)" if no qualifying volume
-  rhPointsTotal: number | null; // Will be 0 if no trades
+  previousDayVolumeAuBoost: number; 
+  auTraderBoost: string | null; 
+  rhPointsTotal: number;
+  todayTotalVolume: number; // New field for today's total volume
   balances?: AsterAccountBalanceV2[];
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
-  userTrades?: AsterUserTrade[]; // Not stored in summary LS, but used for calculation
   webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
   lastUpdated?: number;
 }
@@ -330,12 +329,5 @@ export interface CachedSymbolTrades {
 }
 
 export interface AllCachedTrades {
-  // API Key is part of the top-level key for localStorage
-  // [apiKey: string]: { // This structure is conceptual for how it's used in component state
     [symbol: string]: CachedSymbolTrades;
-  // };
 }
-
-// --- Removed EdgeX Types (kept for reference if needed in future, but not used now) ---
-// ... (All previous EdgeX specific types would be here if not fully removed)
-
