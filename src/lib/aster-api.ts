@@ -85,12 +85,18 @@ export async function fetchAsterAllPremiumIndex(): Promise<AsterPremiumIndex[]> 
   }
 }
 
-
-export async function fetchAsterOrderBook(symbol: string, limit: number = 20): Promise<AsterOrderBookData | null> {
+// Valid limits for AsterDex Order Book: [5, 10, 20, 50, 100, 500, 1000]
+// Using 20 as a default, which seems reasonable for UI display.
+export async function fetchAsterOrderBook(symbol: string, limit: 5 | 10 | 20 | 50 | 100 | 500 | 1000 = 20): Promise<AsterOrderBookData | null> {
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/depth?symbol=${symbol}&limit=${limit}`);
     if (!response.ok) {
-      console.error(`Aster API error (depth for ${symbol}): ${response.status} ${await response.text()}`);
+      const errorBody = await response.text();
+      console.error(`Aster API error (depth for ${symbol}): ${response.status} ${errorBody}`);
+      // Check for specific error code -4021 (invalid depth limit) for better debugging
+      if (errorBody.includes("-4021")) {
+          console.error(`Specific Aster API error: Invalid depth limit used for symbol ${symbol}. Attempted limit: ${limit}. Valid limits: [5, 10, 20, 50, 100, 500, 1000]`);
+      }
       return null;
     }
     return await response.json();
@@ -130,7 +136,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     
     let openInterestValue = 0;
     // Add a delay before fetching OI to respect rate limits.
-    await new Promise(resolve => setTimeout(resolve, 30)); // 30ms delay
+    await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
     const oiData = await fetchAsterOpenInterest(symbolInfo.symbol);
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest) ?? 0;

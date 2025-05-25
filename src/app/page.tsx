@@ -1,34 +1,24 @@
 
 import { getAsterProcessedData } from '@/lib/aster-api';
-// import { getEdgeXProcessedData } from '@/lib/edgex-api'; // EdgeX removed
 import type { ExchangeData } from '@/types';
 import { ExchangeComparisonSummary } from '@/components/exchange-comparison-summary';
 import { AssetDataTable } from '@/components/asset-data-table';
 import { LayoutDashboard } from 'lucide-react';
+import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit';
+
+// IMPORTANT: Replace with your actual AdSense Publisher ID
+const ADSENSE_PUBLISHER_ID = "ca-pub-YOUR_PUBLISHER_ID"; 
+// IMPORTANT: Replace with your actual Ad Slot IDs
+const MID_PAGE_AD_SLOT_ID_OVERVIEW = "YOUR_MID_PAGE_AD_SLOT_ID_OVERVIEW";
+const FOOTER_AD_SLOT_ID_OVERVIEW = "YOUR_FOOTER_AD_SLOT_ID_OVERVIEW";
 
 export default async function HomePage() {
-  // Fetch data in parallel
   const asterResult = await getAsterProcessedData();
-  // const [asterResult, edgeXResult] = await Promise.allSettled([
-  //   getAsterProcessedData(),
-  //   // getEdgeXProcessedData() // EdgeX removed
-  // ]);
 
   const asterExchangeData: ExchangeData | null = asterResult 
     ? { name: 'Aster', metrics: asterResult.metrics, assets: asterResult.assets } 
     : null;
   
-  // const edgeXExchangeData: ExchangeData | null = edgeXResult.status === 'fulfilled' && edgeXResult.value
-  //   ? { name: 'EdgeX', metrics: edgeXResult.value.metrics, assets: edgeXResult.value.assets }
-  //   : null;
-
-  // if (asterResult.status === 'rejected') {
-  //   console.error("Failed to fetch Aster data:", asterResult.reason);
-  // }
-  // if (edgeXResult.status === 'rejected') {
-  //   console.error("Failed to fetch EdgeX data:", edgeXResult.reason);
-  // }
-
   return (
     <div className="space-y-10">
        <header className="pb-2 mb-6 border-b">
@@ -41,8 +31,11 @@ export default async function HomePage() {
 
       <ExchangeComparisonSummary 
         asterData={asterExchangeData?.metrics ?? null} 
-        // edgeXData={edgeXExchangeData?.metrics ?? null} // EdgeX removed
       />
+
+      {/* Mid-Page Ad Placeholder */}
+      <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={MID_PAGE_AD_SLOT_ID_OVERVIEW} className="my-8" />
+
 
       <section>
         <h2 className="text-2xl font-semibold tracking-tight mb-4">AsterDex Assets</h2>
@@ -52,15 +45,8 @@ export default async function HomePage() {
         />
       </section>
 
-      {/* EdgeX Section Removed
-      <section>
-        <h2 className="text-2xl font-semibold tracking-tight mb-4">EdgeX Assets</h2>
-        <AssetDataTable 
-          initialAssets={edgeXExchangeData?.assets ?? null} 
-          exchangeName="EdgeX" 
-        />
-      </section>
-      */}
+      {/* Footer Ad Placeholder */}
+      <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={FOOTER_AD_SLOT_ID_OVERVIEW} className="my-8" />
 
       <footer className="text-center py-6 text-sm text-muted-foreground mt-10 border-t">
         <p>&copy; {new Date().getFullYear()} EdgeView Comparator. Data fetched from public APIs.</p>
