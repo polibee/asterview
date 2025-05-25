@@ -12,7 +12,7 @@ import React from 'react';
 const navigationItems = [
   { href: '/', label: 'Overview' },
   { href: '/asterdex', label: 'AsterDex' },
-  { href: '/edgex', label: 'EdgeX' },
+  // { href: '/edgex', label: 'EdgeX' }, // Removed EdgeX
 ];
 
 export function HeaderNav() {
