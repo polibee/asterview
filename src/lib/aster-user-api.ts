@@ -1,6 +1,10 @@
 
 // src/lib/aster-user-api.ts
-'use server';
+// REMOVED: 'use server'; 
+// IMPORTANT: These functions will now run in the user's browser.
+// This requires the AsterDex API (fapi.asterdex.com) to have CORS headers
+// configured to allow requests from your application's domain for authenticated endpoints.
+// If CORS is not configured correctly on their side, these requests will fail.
 
 import type {
   AsterAccountBalanceV2,
@@ -25,15 +29,12 @@ async function makeAsterAuthenticatedRequest<T>(
   params?: Record<string, any>
 ): Promise<T> {
   if (!apiKey || !secretKey) {
-    // This error should ideally be caught before calling this function,
-    // but as a safeguard:
     console.error('API key or secret key is missing for authenticated request to', endpoint);
     throw new Error('API Key or Secret Key is not configured.');
   }
 
   const timestamp = Date.now();
-  // Ensure recvWindow is always present for signing
-  const queryParams = { ...params, timestamp, recvWindow: 5000 };
+  const queryParams = { ...params, timestamp, recvWindow: 5000 }; // recvWindow is important
 
   const queryString = Object.entries(queryParams)
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
@@ -44,7 +45,7 @@ async function makeAsterAuthenticatedRequest<T>(
 
   const headers = new Headers();
   headers.append('X-MBX-APIKEY', apiKey);
-  if (method === 'POST' || method === 'PUT') {
+  if (method === 'POST' || method === 'PUT' || method === 'DELETE') { // DELETE might also need this
     headers.append('Content-Type', 'application/x-www-form-urlencoded');
   }
 
@@ -53,8 +54,6 @@ async function makeAsterAuthenticatedRequest<T>(
     response = await fetch(url, {
       method: method,
       headers: headers,
-      // Consider adding a timeout if supported by your Next.js version/runtime
-      // signal: AbortSignal.timeout(10000) // Example: 10 second timeout
     });
 
     const responseBodyText = await response.text();
@@ -67,19 +66,21 @@ async function makeAsterAuthenticatedRequest<T>(
           apiErrorMessage = `Aster API Error (${errorJson.code || response.status}): ${errorJson.msg}`;
         }
       } catch (e) {
-        // Ignore parsing error, use the raw text
+        // Ignore parsing error if body isn't JSON, use the raw text
       }
+      // Log the more detailed error that includes the response body text.
       console.error(`Aster User API request to ${endpoint} failed with status ${response.status}. Body: ${responseBodyText}`);
       throw new Error(apiErrorMessage);
     }
-
+    
     // Handle potentially empty successful responses (e.g., for PUT/DELETE on listenKey)
     if (responseBodyText.trim() === '' || responseBodyText.trim() === '{}') {
         if (response.status === 200 && (method === 'PUT' || method === 'DELETE')) {
-            return {} as T; // Expected empty success
+             // For PUT/DELETE listenKey, an empty JSON object {} is a success.
+            return {} as T;
         }
     }
-
+    
     try {
         return JSON.parse(responseBodyText) as T;
     } catch (e) {
@@ -89,17 +90,15 @@ async function makeAsterAuthenticatedRequest<T>(
 
   } catch (error: any) {
     // This catch block handles errors from the fetch() call itself (e.g., network issues)
-    // or errors thrown from the !response.ok block, or JSON parsing errors.
-    if (!response) { // Indicates fetch() itself failed
-      console.error(`Network error or failed to initiate fetch for Aster User API (${endpoint} - ${method}):`, error.message);
-      throw new Error(`Network error communicating with AsterDex API: ${error.message}`);
+    // or errors re-thrown from the !response.ok block, or JSON parsing errors.
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      // Network error (e.g., CORS, DNS, server unreachable)
+      console.warn(`Network error or CORS issue fetching Aster User API (${endpoint} - ${method}): ${error.message}. Ensure AsterDex API allows requests from this origin.`);
+      throw new Error(`Network error or CORS issue communicating with AsterDex API: ${error.message}. Please check browser console for details.`);
+    } else if (!(error.message.startsWith("Aster API Error") || error.message.startsWith("Failed to parse API response") || error.message.startsWith("Network error or CORS issue"))) {
+        console.error(`Unexpected error during Aster User API request to ${endpoint} (${method}):`, error);
     }
-    // If 'error' was re-thrown from the !response.ok block or JSON parse error, it's already specific.
-    // If it's a different kind of error caught here, log it.
-    if (!(error.message.startsWith("Aster API Error") || error.message.startsWith("Failed to parse API response"))) {
-        console.error(`Unexpected error during Aster User API request to ${endpoint} (${method}):`, error.message);
-    }
-    throw error; // Re-throw the error to be handled by the Server Action caller
+    throw error; // Re-throw the error to be handled by the calling component
   }
 }
 
@@ -111,10 +110,6 @@ export async function fetchAsterAccountInfo(apiKey: string, secretKey: string): 
   return makeAsterAuthenticatedRequest<AsterAccountInfoV2>(`${ASTER_API_V2_BASE_URL}/account`, 'GET', apiKey, secretKey);
 }
 
-// Positions are part of /v2/account, so a separate call might not be needed if accountInfo is fetched.
-// However, if only positions are needed, /v2/positionRisk can be used.
-// For simplicity and to reduce calls, positions are typically taken from accountInfo.
-// This function remains if direct position fetching is ever preferred.
 export async function fetchAsterPositions(apiKey: string, secretKey: string, symbol?: string): Promise<AsterPositionV2[]> {
   const params: Record<string, any> = {};
   if (symbol) {
@@ -133,9 +128,9 @@ export async function fetchAsterUserTrades(
   endTime?: number
 ): Promise<AsterUserTrade[]> {
   const params: Record<string, any> = { symbol, limit };
-  if (fromId) params.fromId = fromId;
-  if (startTime) params.startTime = startTime;
-  if (endTime) params.endTime = endTime;
+  if (fromId !== undefined) params.fromId = fromId;
+  if (startTime !== undefined) params.startTime = startTime;
+  if (endTime !== undefined) params.endTime = endTime;
 
   return makeAsterAuthenticatedRequest<AsterUserTrade[]>(`${ASTER_API_BASE_URL}/userTrades`, 'GET', apiKey, secretKey, params);
 }
@@ -164,12 +159,13 @@ export async function fetchAsterIncomeHistory(
 
 
 // --- Listen Key for WebSocket ---
+// These also become client-side. Note: ListenKey management directly from the client
+// means the API key is exposed in these non-signed requests too.
 export async function createAsterListenKey(apiKey: string): Promise<AsterListenKey> {
   if (!apiKey) {
     console.error('API key is missing for creating listen key.');
     throw new Error('API key is missing for creating listen key.');
   }
-  // This is a POST request but doesn't require a signed payload, only the API key in the header.
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'POST',
@@ -182,6 +178,10 @@ export async function createAsterListenKey(apiKey: string): Promise<AsterListenK
     }
     return JSON.parse(responseBodyText) as AsterListenKey;
   } catch (error: any) {
+     if (error instanceof TypeError && error.message === "Failed to fetch") {
+      console.warn(`Network error or CORS issue creating Aster ListenKey: ${error.message}.`);
+      throw new Error(`Network error or CORS issue creating Aster ListenKey: ${error.message}.`);
+    }
     console.error('Failed to create Aster ListenKey:', error.message);
     throw new Error(`Failed to create Aster ListenKey: ${error.message}`);
   }
@@ -192,22 +192,26 @@ export async function keepAliveAsterListenKey(apiKey: string, listenKeyToUse: st
     console.error('API key is missing for keepAlive.');
     throw new Error('API key is missing for keepAlive.');
   }
-   // listenKeyToUse is for internal tracking/logging if needed, not sent in request body
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'PUT',
       headers: { 'X-MBX-APIKEY': apiKey },
+       // Body for PUT listenKey is just listenKey=<theKey> but it's actually just managed by API Key
     });
     const responseBodyText = await response.text();
     if (!response.ok) {
-      console.error(`Aster ListenKey keepAlive error for key associated with API key (status ${response.status}): ${responseBodyText}`);
+      console.error(`Aster ListenKey keepAlive error for key (status ${response.status}): ${responseBodyText}`);
       throw new Error(`ListenKey keepAlive failed (status ${response.status}): ${responseBodyText.substring(0,100)}`);
     }
     if (responseBodyText.trim() === '{}' || responseBodyText.trim() === '') {
-        return {};
+        return {}; // Success with empty body
     }
-    return JSON.parse(responseBodyText);
+    return JSON.parse(responseBodyText); // Success usually returns {}
   } catch (error: any) {
+     if (error instanceof TypeError && error.message === "Failed to fetch") {
+      console.warn(`Network error or CORS issue keeping alive Aster ListenKey: ${error.message}.`);
+      throw new Error(`Network error or CORS issue keeping alive Aster ListenKey: ${error.message}.`);
+    }
     console.error('Failed to keepAlive Aster ListenKey:', error.message);
     throw new Error(`Failed to keepAlive Aster ListenKey: ${error.message}`);
   }
@@ -218,23 +222,28 @@ export async function deleteAsterListenKey(apiKey: string, listenKeyToUse: strin
     console.error('API key is missing for delete.');
     throw new Error('API key is missing for delete.');
   }
-  // listenKeyToUse is for internal tracking/logging if needed, not sent in request body
   try {
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'DELETE',
       headers: { 'X-MBX-APIKEY': apiKey },
+      // Body for DELETE listenKey is just listenKey=<theKey> but it's actually just managed by API Key
     });
     const responseBodyText = await response.text();
      if (!response.ok) {
-      console.error(`Aster ListenKey delete error for key associated with API key (status ${response.status}): ${responseBodyText}`);
+      console.error(`Aster ListenKey delete error for key (status ${response.status}): ${responseBodyText}`);
       throw new Error(`ListenKey delete failed (status ${response.status}): ${responseBodyText.substring(0,100)}`);
     }
     if (responseBodyText.trim() === '{}' || responseBodyText.trim() === '') {
-        return {};
+        return {}; // Success with empty body
     }
-    return JSON.parse(responseBodyText);
+    return JSON.parse(responseBodyText); // Success usually returns {}
   } catch (error:any) {
+     if (error instanceof TypeError && error.message === "Failed to fetch") {
+      console.warn(`Network error or CORS issue deleting Aster ListenKey: ${error.message}.`);
+      throw new Error(`Network error or CORS issue deleting Aster ListenKey: ${error.message}.`);
+    }
     console.error('Failed to delete Aster ListenKey:', error.message);
     throw new Error(`Failed to delete Aster ListenKey: ${error.message}`);
   }
 }
+
