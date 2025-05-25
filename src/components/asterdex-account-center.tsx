@@ -3,7 +3,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import type { AsterAccountSummaryData, AsterAccountBalanceV2, AsterAccountInfoV2, AsterPositionV2, AsterCommissionRate } from '@/types';
+import type { AsterAccountSummaryData, AsterAccountBalanceV2, AsterAccountInfoV2, AsterPositionV2, AsterCommissionRate, AsterUserTrade } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -16,12 +16,13 @@ import {
   fetchAsterAccountInfo,
   fetchAsterPositions,
   fetchAsterCommissionRate,
-  // More specific fetch functions for trades can be added here
+  fetchAsterUserTrades,
 } from '@/lib/aster-user-api';
 import { 
   DollarSign, TrendingDown, TrendingUp, ListChecks, BarChart3, Landmark, Percent, Zap, ArrowUpRightSquare, Trophy, Info, Settings, AlertTriangle, WifiOff, Wifi
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format, startOfUTCDay, endOfUTCDay, fromUnixTime } from 'date-fns';
 
 const parseFloatSafe = (value: string | number | undefined | null, defaultValue: number | null = null): number | null => {
   if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
@@ -95,6 +96,16 @@ export function AsterdexAccountCenter() {
   const [error, setError] = useState<string | null>(null);
   const [webSocketStatus, setWebSocketStatus] = useState<AsterAccountSummaryData['webSocketStatus']>('Disconnected');
 
+  const resetAccountDataToDefaults = () => {
+    setAccountData({
+      portfolioValue: null, totalUnrealizedPNL: null, totalRealizedPNL: null,
+      totalTrades: null, totalVolume: null, totalFeesPaid: null,
+      commissionRateMaker: null, commissionRateTaker: null, commissionSymbol: null,
+      todayVolumeAuBoost: null, auTraderBoost: null, rhPointsTotal: null,
+      balances: [], accountInfo: undefined, positions: [], userTrades: [],
+      webSocketStatus: 'Disconnected'
+    });
+  };
 
   useEffect(() => {
     const storedApiKey = localStorage.getItem('asterApiKey');
@@ -105,21 +116,80 @@ export function AsterdexAccountCenter() {
       setTempApiKey(storedApiKey);
       setTempSecretKey(storedSecretKey);
       setIsApiKeysSet(true);
+    } else {
+      resetAccountDataToDefaults();
     }
   }, []);
+
+  const calculateTradeMetrics = (trades: AsterUserTrade[]): Partial<AsterAccountSummaryData> => {
+    if (!trades || trades.length === 0) {
+      return {
+        totalRealizedPNL: 0, totalTrades: 0, totalVolume: 0, totalFeesPaid: 0,
+        todayVolumeAuBoost: 0, auTraderBoost: "1x (Base)", rhPointsTotal: 0,
+      };
+    }
+
+    let totalRealizedPNL = 0;
+    let totalVolume = 0;
+    let totalFeesPaid = 0;
+    let todayTakerVolume = 0;
+    let todayMakerVolume = 0;
+    let allTradesTakerVolume = 0;
+    let allTradesMakerVolume = 0;
+
+    const todayStart = startOfUTCDay(new Date()).getTime();
+    const todayEnd = endOfUTCDay(new Date()).getTime();
+
+    trades.forEach(trade => {
+      totalRealizedPNL += parseFloatSafe(trade.realizedPnl) ?? 0;
+      totalVolume += parseFloatSafe(trade.quoteQty) ?? 0;
+      totalFeesPaid += parseFloatSafe(trade.commission) ?? 0; // Commission can be negative (rebate)
+
+      const tradeTime = typeof trade.time === 'string' ? parseIntSafe(trade.time) : trade.time;
+      const tradeQuoteQty = parseFloatSafe(trade.quoteQty) ?? 0;
+
+      if (tradeTime >= todayStart && tradeTime <= todayEnd) {
+        if (trade.maker === false) { // Taker
+          todayTakerVolume += tradeQuoteQty;
+        } else { // Maker
+          todayMakerVolume += tradeQuoteQty;
+        }
+      }
+
+      if (trade.maker === false) { // Taker
+        allTradesTakerVolume += tradeQuoteQty;
+      } else { // Maker
+        allTradesMakerVolume += tradeQuoteQty;
+      }
+    });
+
+    const todayVolumeAuBoost = todayTakerVolume + (todayMakerVolume * 0.5);
+    
+    // Au Trader Boost Tiers (from docs/asterpoint.md - "Adjust on 12 May")
+    let auTraderBoost = "1x"; // Base
+    if (todayVolumeAuBoost >= 500000) auTraderBoost = "3x";
+    else if (todayVolumeAuBoost >= 200000) auTraderBoost = "2.6x";
+    else if (todayVolumeAuBoost >= 50000) auTraderBoost = "2.4x";
+    else if (todayVolumeAuBoost >= 10000) auTraderBoost = "2x";
+    // Note: "New adjustment on 21 May" adds +1x, etc. This is the base multiplier.
+
+    const rhPointsTotal = allTradesTakerVolume + (allTradesMakerVolume * 0.5);
+
+    return {
+      totalRealizedPNL,
+      totalTrades: trades.length,
+      totalVolume,
+      totalFeesPaid,
+      todayVolumeAuBoost,
+      auTraderBoost,
+      rhPointsTotal,
+    };
+  };
 
   const loadAccountData = useCallback(async () => {
     if (!apiKey || !secretKey) {
       setError("API Key and Secret Key are required.");
-      setAccountData(prev => ({
-        ...(prev || {} as AsterAccountSummaryData),
-        portfolioValue: null, totalUnrealizedPNL: null, totalRealizedPNL: null,
-        totalTrades: null, totalVolume: null, totalFeesPaid: null,
-        commissionRateMaker: null, commissionRateTaker: null, commissionSymbol: null,
-        todayVolumeAuBoost: null, auTraderBoost: null, rhPointsTotal: null,
-        balances: [], accountInfo: undefined, positions: [],
-        webSocketStatus: 'Disconnected'
-      }));
+      resetAccountDataToDefaults();
       return;
     }
     setIsLoading(true);
@@ -127,11 +197,12 @@ export function AsterdexAccountCenter() {
     const defaultCommissionSymbol = 'BTCUSDT'; 
 
     try {
-      const [balances, accInfo, positions, commissionInfo] = await Promise.all([
+      const [balances, accInfo, positions, commissionInfo, userTradesResponse] = await Promise.all([
         fetchAsterAccountBalances(apiKey, secretKey),
         fetchAsterAccountInfo(apiKey, secretKey),
         fetchAsterPositions(apiKey, secretKey), 
-        fetchAsterCommissionRate(apiKey, secretKey, defaultCommissionSymbol)
+        fetchAsterCommissionRate(apiKey, secretKey, defaultCommissionSymbol),
+        fetchAsterUserTrades(apiKey, secretKey, defaultCommissionSymbol, 200) // Fetch recent 200 trades for commission symbol
       ]);
 
       if (!accInfo || !balances) {
@@ -140,46 +211,32 @@ export function AsterdexAccountCenter() {
       
       const portfolioValue = parseFloatSafe(accInfo.totalMarginBalance);
       const totalUnrealizedPNL = parseFloatSafe(accInfo.totalUnrealizedProfit);
+      const userTrades = userTradesResponse || [];
+      const tradeMetrics = calculateTradeMetrics(userTrades);
 
       setAccountData({
         portfolioValue,
         totalUnrealizedPNL,
-        totalRealizedPNL: null, 
-        totalTrades: null, 
-        totalVolume: null, 
-        totalFeesPaid: null, 
+        totalRealizedPNL: tradeMetrics.totalRealizedPNL ?? null,
+        totalTrades: tradeMetrics.totalTrades ?? null,
+        totalVolume: tradeMetrics.totalVolume ?? null,
+        totalFeesPaid: tradeMetrics.totalFeesPaid ?? null,
         commissionRateMaker: commissionInfo?.makerCommissionRate ?? null,
         commissionRateTaker: commissionInfo?.takerCommissionRate ?? null,
         commissionSymbol: commissionInfo?.symbol ?? defaultCommissionSymbol,
-        todayVolumeAuBoost: null, 
-        auTraderBoost: null, 
-        rhPointsTotal: null, 
+        todayVolumeAuBoost: tradeMetrics.todayVolumeAuBoost ?? null,
+        auTraderBoost: tradeMetrics.auTraderBoost ?? null,
+        rhPointsTotal: tradeMetrics.rhPointsTotal ?? null,
         balances: balances || [],
         accountInfo: accInfo,
         positions: positions || [],
+        userTrades: userTrades,
         webSocketStatus: webSocketStatus, 
       });
 
     } catch (err: any) {
       setError(err.message || "An unknown error occurred while fetching account data.");
-      setAccountData({ // Ensure a defined structure even on error
-        portfolioValue: null,
-        totalUnrealizedPNL: null,
-        totalRealizedPNL: null,
-        totalTrades: null,
-        totalVolume: null,
-        totalFeesPaid: null,
-        commissionRateMaker: null,
-        commissionRateTaker: null,
-        commissionSymbol: defaultCommissionSymbol,
-        todayVolumeAuBoost: null,
-        auTraderBoost: null,
-        rhPointsTotal: null,
-        balances: [],
-        accountInfo: undefined, 
-        positions: [],
-        webSocketStatus: 'Disconnected' 
-      });
+      resetAccountDataToDefaults();
     } finally {
       setIsLoading(false);
     }
@@ -213,10 +270,11 @@ export function AsterdexAccountCenter() {
     localStorage.removeItem('asterApiKey');
     localStorage.removeItem('asterSecretKey');
     setIsApiKeysSet(false);
-    setAccountData(null);
+    setAccountData(null); // Clear data
     setError(null);
     setWebSocketStatus('Disconnected');
     toast({ title: "Disconnected", description: "API Keys have been cleared." });
+    resetAccountDataToDefaults(); // Explicitly reset to defaults
   };
 
   const getPnlVariant = (pnl: number | null): MetricCardProps['variant'] => {
@@ -341,7 +399,7 @@ export function AsterdexAccountCenter() {
             <MetricCard 
               title="Total Realized PNL" 
               value={formatUsd(accountData?.totalRealizedPNL)} 
-              description="Requires trade history processing" 
+              description={`Based on last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
               icon={TrendingUp} 
               isLoading={isLoading} 
               variant={getPnlVariant(accountData?.totalRealizedPNL)}
@@ -349,35 +407,35 @@ export function AsterdexAccountCenter() {
             <MetricCard 
               title="Total Trades" 
               value={formatNumber(accountData?.totalTrades)} 
-              description={"Requires trade history processing"}
+              description={`Last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
               icon={ListChecks} 
               isLoading={isLoading}
             />
             <MetricCard 
-              title="Total Volume" 
+              title="Total Volume Traded" 
               value={formatUsd(accountData?.totalVolume)} 
-              description={"Requires trade history processing"}
+              description={`From last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
               icon={BarChart3} 
               isLoading={isLoading}
             />
             <MetricCard 
               title="Total Fees Paid" 
               value={formatUsd(accountData?.totalFeesPaid)} 
-              description="Requires trade history processing" 
+              description={`From last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || 'symbol'}`}
               icon={Landmark} 
               isLoading={isLoading}
             />
             <MetricCard 
-              title="Today's Volume (Au Boost)" 
+              title="Today's Volume (Au Boost Calc)" 
               value={formatUsd(accountData?.todayVolumeAuBoost)} 
-              description="Pro Taker + 0.5 * Pro Maker (Today UTC)" 
+              description={`Pro Taker + 0.5*Maker (Today UTC, ${accountData?.commissionSymbol || 'symbol'})`}
               icon={Zap} 
               isLoading={isLoading}
             />
             <MetricCard 
-              title="Au Trader Boost" 
+              title="Au Trader Boost Factor" 
               value={accountData?.auTraderBoost || (isLoading ? "Loading..." : "N/A")} 
-              description="Based on today's volume" 
+              description="Based on Today's Volume (before other boosts)"
               icon={ArrowUpRightSquare} 
               isLoading={isLoading}
             />
@@ -385,9 +443,9 @@ export function AsterdexAccountCenter() {
 
           <div className="mt-6">
              <MetricCard 
-              title="Rh Points (Total)" 
+              title="Rh Points (Base)" 
               value={formatNumber(accountData?.rhPointsTotal)} 
-              description="Based on historical trades (Taker + 0.5*Maker)" 
+              description={`From last ${accountData?.userTrades?.length || 0} trades (before other boosts, ${accountData?.commissionSymbol || 'symbol'})`}
               icon={Trophy} 
               isLoading={isLoading}
               className="lg:col-span-3"
@@ -399,15 +457,19 @@ export function AsterdexAccountCenter() {
       <Card className="mt-6 bg-muted/30 dark:bg-muted/20 border-primary/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Info size={18} className="text-primary"/> Points Program Info
+            <Info size={18} className="text-primary"/> Points Program & Data Info
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground space-y-1.5">
-          <p><strong className="text-foreground">Au Points:</strong> Calculation depends on specific "Earn Asset" holdings, which are not available via the current API. The "Au Trader Boost" shown is based on your daily trading volume but applies to Au Points you might earn elsewhere.</p>
-          <p><strong className="text-foreground">Rh Points:</strong> Calculated based on your total trading volume (Taker + 0.5 \* Maker). Team boosts, user-specific Rh boosts, and referral bonuses are not included in this display as they require external data.</p>
-          <p className="text-xs mt-2 italic">Note: Data for Realized PNL, Total Trades, Volume, Fees Paid, and Points Program metrics are placeholders. Full implementation requires processing user trade history and specific program logic.</p>
+          <p><strong className="text-foreground">Trade-Based Metrics:</strong> Realized PNL, Total Trades, Volume, Fees, and Points Program values are calculated from the <strong className="text-foreground">last {accountData?.userTrades?.length || 200} trades for the symbol {accountData?.commissionSymbol || 'BTCUSDT'}</strong>. This is not full historical data.</p>
+          <p><strong className="text-foreground">Au Points:</strong> Actual Au Points depend on "Earn Asset" holdings (not shown here). "Au Trader Boost Factor" is the multiplier derived from today's trading volume for {accountData?.commissionSymbol || 'BTCUSDT'}, as per AsterDex docs.</p>
+          <p><strong className="text-foreground">Rh Points:</strong> "Rh Points (Base)" are calculated from the fetched trades (Taker Vol + 0.5 \* Maker Vol). This does not include team boosts, user-specific Rh boosts, or referral bonuses.</p>
+          <p className="text-xs mt-2 italic">For complete and historical data, a backend processing solution is recommended. WebSocket updates for these metrics are planned for future enhancements.</p>
         </CardContent>
       </Card>
     </div>
   );
 }
+
+
+    
