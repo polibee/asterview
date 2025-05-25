@@ -1,4 +1,5 @@
 
+
 export interface MarketData {
   id: string;
   symbol: string; // e.g., "BTC/USD"
@@ -110,41 +111,41 @@ export interface AsterOrderBookData {
 export interface AsterAccountBalanceV2 {
   accountAlias: string;
   asset: string;
-  a?: string; // Alternative key from WebSocket
+  a?: string; 
   balance: string;
-  wb?: string; // Alternative key from WebSocket
+  wb?: string; 
   crossWalletBalance: string;
-  cw?: string; // Alternative key from WebSocket
+  cw?: string; 
   crossUnPnl?: string;
   availableBalance: string;
   maxWithdrawAmount: string;
   marginAvailable: boolean;
   updateTime: number;
-  bc?: string; // Balance Change from WebSocket
+  bc?: string; 
 }
 
 export interface AsterPositionV2 {
   symbol: string;
-  s?: string; // Alternative key from WebSocket
+  s?: string; 
   initialMargin: string;
   maintMargin: string;
   unrealizedProfit: string;
-  up?: string; // Alternative key from WebSocket
+  up?: string; 
   positionInitialMargin: string;
   openOrderInitialMargin: string;
   leverage: string;
   isolated: boolean;
   entryPrice: string;
-  ep?: string; // Alternative key from WebSocket
+  ep?: string; 
   maxNotional: string;
   positionSide: 'BOTH' | 'LONG' | 'SHORT';
-  ps?: 'BOTH' | 'LONG' | 'SHORT'; // Alternative key from WebSocket
+  ps?: 'BOTH' | 'LONG' | 'SHORT'; 
   positionAmt: string;
-  pa?: string; // Alternative key from WebSocket
+  pa?: string; 
   updateTime: number;
-  mt?: 'isolated' | 'cross'; // Margin Type from WebSocket
-  iw?: string; // Isolated Wallet from WebSocket
-  cr?: string; // (Pre-fee) Accumulated Realized from WebSocket
+  mt?: 'isolated' | 'cross'; 
+  iw?: string; 
+  cr?: string; 
   marginType?: "isolated" | "cross";
   isAutoAddMargin?: "true" | "false";
   isolatedMargin?: string;
@@ -220,31 +221,31 @@ export interface AsterListenKey {
 
 // --- Aster WebSocket User Data Stream Event Payloads ---
 export interface AsterWebSocketUpdateAccountDataBalance {
-  a: string;
-  wb: string;
-  cw: string;
-  bc: string;
+  a: string; // Asset
+  wb: string; // Wallet Balance
+  cw: string; // Cross Wallet Balance
+  bc: string; // Balance Change except PnL and Commission
 }
 export interface AsterWebSocketUpdateAccountDataPosition {
-  s: string;
-  pa: string;
-  ep: string;
-  cr: string;
-  up: string;
-  mt: 'isolated' | 'cross';
-  iw: string;
-  ps: 'BOTH' | 'LONG' | 'SHORT';
+  s: string;  // Symbol
+  pa: string; // Position Amount
+  ep: string; // Entry Price
+  cr: string; // (Pre-fee) Accumulated Realized
+  up: string; // Unrealized PnL
+  mt: 'isolated' | 'cross'; // Margin Type
+  iw: string; // Isolated Wallet (if isolated position)
+  ps: 'BOTH' | 'LONG' | 'SHORT'; // Position Side
 }
 export interface AsterWebSocketUpdateAccountData {
-  m: string;
-  B: AsterWebSocketUpdateAccountDataBalance[];
-  P: AsterWebSocketUpdateAccountDataPosition[];
+  m: string; // Event reason type
+  B: AsterWebSocketUpdateAccountDataBalance[]; // Balances
+  P: AsterWebSocketUpdateAccountDataPosition[]; // Positions
 }
 export interface AsterWebSocketUpdateAccount {
-  e: "ACCOUNT_UPDATE";
-  E: number;
-  T: number;
-  a: AsterWebSocketUpdateAccountData;
+  e: "ACCOUNT_UPDATE"; // Event Type
+  E: number; // Event Time
+  T: number; // Transaction Time
+  a: AsterWebSocketUpdateAccountData; // Update Data
 }
 export interface AsterWebSocketOrderUpdateData {
   s: string; c: string; S: 'BUY' | 'SELL'; o: string; f: string; q: string; p: string; ap: string; sp: string; x: string; X: string; i: number; l: string; z: string; L: string; N?: string; n?: string; T: number; t: number; b: string; a: string; m: boolean; R: boolean; wt: string; ot: string; ps: 'BOTH' | 'LONG' | 'SHORT'; cp: boolean; AP?: string; cr?: string; rp: string;
@@ -262,7 +263,7 @@ export interface ExchangeAssetDetail {
   symbol: string;
   price: number;
   dailyVolume: number;
-  baseAssetVolume24h?: number;
+  baseAssetVolume24h?: number; // Volume in base asset
   openInterest: number;
   dailyTrades: number;
   fundingRate: number | null;
@@ -272,7 +273,7 @@ export interface ExchangeAssetDetail {
   low24h: number | null;
   markPrice: number | null;
   indexPrice: number | null;
-  oraclePrice?: number | null;
+  oraclePrice?: number | null; // From EdgeX, not typically primary display but good to have
   exchange: 'Aster';
   iconUrl?: string;
 }
@@ -297,25 +298,25 @@ export type UnifiedOrderBookEntry = {
 export interface AsterAccountSummaryData {
   portfolioValue: number | null;
   totalUnrealizedPNL: number | null;
-  totalRealizedPNL: number | null;
-  totalTrades: number | null;
-  longTrades: number | null;
-  shortTrades: number | null;
-  totalVolume: number | null;
-  longVolume: number | null;
-  shortVolume: number | null;
-  totalFeesPaid: number | null;
+  totalRealizedPNL: number | null; // Will be 0 if no trades
+  totalTrades: number | null; // Will be 0 if no trades
+  longTrades: number | null; // Will be 0 if no trades
+  shortTrades: number | null; // Will be 0 if no trades
+  totalVolume: number | null; // Will be 0 if no trades
+  longVolume: number | null; // Will be 0 if no trades
+  shortVolume: number | null; // Will be 0 if no trades
+  totalFeesPaid: number | null; // Will be 0 if no trades
   latestFee: number | null;
   commissionRateTaker: string | null;
   commissionRateMaker: string | null;
   commissionSymbol: string | null;
-  todayVolumeAuBoost: number | null;
-  auTraderBoost: string | null;
-  rhPointsTotal: number | null;
+  previousDayVolumeAuBoost: number | null; // Renamed from todayVolumeAuBoost, will be 0
+  auTraderBoost: string | null; // Will be "1x (Base)" if no qualifying volume
+  rhPointsTotal: number | null; // Will be 0 if no trades
   balances?: AsterAccountBalanceV2[];
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
-  userTrades?: AsterUserTrade[];
+  userTrades?: AsterUserTrade[]; // Not stored in summary LS, but used for calculation
   webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
   lastUpdated?: number;
 }
@@ -323,13 +324,18 @@ export interface AsterAccountSummaryData {
 // For caching trades
 export interface CachedSymbolTrades {
   trades: AsterUserTrade[];
-  newestTradeId: number | null; // ID of the newest trade fetched for this symbol
-  oldestTradeIdKnown: number | null; // ID of the oldest trade fetched (used for fetching older history later if needed)
-  allHistoryFetched?: boolean; // Flag to indicate if we believe all history has been fetched for this symbol
+  newestTradeId: number | null; 
+  oldestTradeIdKnown: number | null; 
+  allHistoryFetched?: boolean; 
 }
 
 export interface AllCachedTrades {
-  [apiKey: string]: { // API Key is part of the top-level key
+  // API Key is part of the top-level key for localStorage
+  // [apiKey: string]: { // This structure is conceptual for how it's used in component state
     [symbol: string]: CachedSymbolTrades;
-  };
+  // };
 }
+
+// --- Removed EdgeX Types (kept for reference if needed in future, but not used now) ---
+// ... (All previous EdgeX specific types would be here if not fully removed)
+

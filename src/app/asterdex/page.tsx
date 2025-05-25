@@ -1,81 +1,99 @@
 
-'use client'; 
+'use client';
 
 import React from 'react';
 import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api';
-import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookEntry } from '@/types';
+import type { ExchangeAssetDetail, ExchangeData, AsterOrderBookData } from '@/types';
 import { AssetDataTable } from '@/components/asset-data-table';
+// import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; // Aster doesn't have this
 import { OrderBookDisplay } from '@/components/order-book-display';
-// import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; // Kept for context, now replaced by AsterdexAccountCenter
 import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
-import { CandlestickChart, AlertTriangle } from 'lucide-react';
+import { CandlestickChart, AlertTriangle, ServerCrash } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 
 export default function AsterDexPage() {
-  const [exchangeData, setExchangeData] = React.useState<{ assets: ExchangeAssetDetail[] } | null>(null);
+  // State for initial page data (assets for the table)
+  const [exchangeData, setExchangeData] = React.useState<ExchangeData>({ name: 'Aster', metrics: null, assets: [] });
+  
+  // State for order book
   const [orderBook, setOrderBook] = React.useState<AsterOrderBookData | null>(null);
   const [selectedSymbolForOrderBook, setSelectedSymbolForOrderBook] = React.useState<string | null>(null);
-  
-  const [isLoadingPageData, setIsLoadingPageData] = React.useState(true);
   const [isLoadingOrderBook, setIsLoadingOrderBook] = React.useState(false);
+
+  // General page loading and error states
+  const [isLoadingPageData, setIsLoadingPageData] = React.useState(true);
   const [pageError, setPageError] = React.useState<string | null>(null);
 
+  // Effect for loading initial asset data for the AssetDataTable
   React.useEffect(() => {
-    async function loadData() {
+    async function loadInitialData() {
+      if (exchangeData.assets && exchangeData.assets.length > 0 && !pageError) {
+        // Data already loaded, no need to fetch again unless there was an error
+        setIsLoadingPageData(false);
+        return;
+      }
+      
       setIsLoadingPageData(true);
-      setPageError(null);
+      setPageError(null); // Clear previous errors
+
       try {
-        const result = await getAsterProcessedData();
-        if (result && result.assets) {
-          setExchangeData({ assets: result.assets });
-          if (result.assets.length > 0 && result.assets[0]?.id) {
-            setSelectedSymbolForOrderBook(result.assets[0].id);
+        const processedData = await getAsterProcessedData();
+        if (processedData && processedData.assets) {
+          setExchangeData({ name: 'Aster', metrics: processedData.metrics, assets: processedData.assets });
+          if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
+            setSelectedSymbolForOrderBook(processedData.assets[0].id);
+          } else if (processedData.assets.length === 0) {
+             console.warn("AsterDex: No assets returned from getAsterProcessedData.");
           }
         } else {
-          // This handles the case where getAsterProcessedData might return a structure that's not as expected,
-          // or if assets array is missing, though getAsterProcessedData is designed to return { metrics, assets }.
-          console.error("Failed to process AsterDex exchange data or no assets found in result structure.");
-          setExchangeData({ assets: [] }); // Ensure exchangeData is not null and has an empty assets array
-          // Not setting pageError here explicitly if assets are just empty, that's handled by components.
+           console.error("AsterDex: Failed to process exchange data or no assets found.");
+           setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
+           setExchangeData({ name: 'Aster', metrics: null, assets: [] });
         }
       } catch (error: any) {
         console.error("Error loading initial AsterDex page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] }); 
+        setExchangeData({ name: 'Aster', metrics: null, assets: [] });
       } finally {
         setIsLoadingPageData(false);
       }
     }
-    loadData();
-  }, []); 
 
+    loadInitialData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Changed dependency array
+
+  // Effect for loading order book data when selectedSymbolForOrderBook changes or pageError is cleared
   React.useEffect(() => {
     if (pageError || !selectedSymbolForOrderBook) {
-        setOrderBook(null); // Clear order book if there's an error or no symbol
-        setIsLoadingOrderBook(false);
-        return;
+      setOrderBook(null);
+      setIsLoadingOrderBook(false);
+      return;
     }
 
     async function loadOrderBook() {
       setIsLoadingOrderBook(true);
-      setOrderBook(null); 
+      setOrderBook(null); // Clear previous order book data
       try {
-        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook!, 50); 
+        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook!, 50); // Fetching 50 levels
         setOrderBook(obData);
       } catch (error) {
         console.warn(`Error loading AsterDex order book for ${selectedSymbolForOrderBook}:`, error);
-        setOrderBook(null);
+        setOrderBook(null); // Set to null on error to clear display
       } finally {
         setIsLoadingOrderBook(false);
       }
     }
+
     loadOrderBook();
   }, [selectedSymbolForOrderBook, pageError]);
 
   const availableSymbolsForOrderBook = React.useMemo(() => {
-    return exchangeData?.assets.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
-  }, [exchangeData]);
+    return exchangeData.assets.map(asset => ({ id: asset.id, name: asset.symbol }));
+  }, [exchangeData.assets]);
+
 
   if (isLoadingPageData && !pageError) {
     return (
@@ -83,9 +101,8 @@ export default function AsterDexPage() {
         <header className="pb-4 mb-6 border-b">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <CandlestickChart className="h-8 w-8 text-primary" />
-            AsterDex
+            AsterDex Exchange
           </h1>
-          <p className="text-muted-foreground mt-1">Account overview and market data from AsterDex.</p>
         </header>
         <Skeleton className="h-64 w-full mb-6 rounded-lg" /> {/* Skeleton for Account Center */}
         <Skeleton className="h-32 w-full mb-6 rounded-lg" /> {/* Skeleton for Order Book */}
@@ -93,30 +110,39 @@ export default function AsterDexPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-8">
-      <header className="pb-2 mb-6 border-b">
+      <header className="pb-4 mb-6 border-b">
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
           <CandlestickChart className="h-8 w-8 text-primary" />
-          AsterDex
+          AsterDex Exchange
         </h1>
-        <p className="text-muted-foreground mt-1">Account overview and market data from AsterDex.</p>
+        <p className="text-muted-foreground mt-1">Detailed market data and account overview for AsterDex.</p>
       </header>
 
       {pageError && !isLoadingPageData && (
          <Card className="shadow-lg rounded-lg border-destructive my-4">
-          <CardContent className="p-6 flex flex-col items-center justify-center text-center">
-            <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-            <h2 className="text-xl font-semibold text-destructive mb-2">Error Fetching Page Data</h2>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ServerCrash className="h-6 w-6 text-destructive" />
+              API Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 text-center">
+            <p className="text-lg font-semibold text-destructive mb-2">Failed to Load AsterDex Data</p>
             <p className="text-muted-foreground">{pageError}</p>
-            <p className="text-sm text-muted-foreground mt-2">Some components might not load correctly.</p>
+            <p className="text-sm text-muted-foreground mt-2">Please try refreshing the page later. Some components might not load correctly.</p>
           </CardContent>
         </Card>
       )}
 
       <section>
         <AsterdexAccountCenter />
+      </section>
+
+      <section>
+         {/* LongShortRatioDisplay removed as AsterDex API doesn't support it well */}
       </section>
 
       <section>
@@ -132,20 +158,19 @@ export default function AsterDexPage() {
       </section>
       
       <section>
-        <h2 className="text-2xl font-semibold tracking-tight mb-4 mt-6">Market Asset Details</h2>
+        <h2 className="text-2xl font-semibold tracking-tight mb-4 mt-6">AsterDex Assets</h2>
          {pageError && !isLoadingPageData && (
             <Card className="shadow-lg rounded-lg border-destructive my-4">
             <CardContent className="p-6 flex flex-col items-center justify-center text-center">
                 <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
-                <h2 className="text-xl font-semibold text-destructive mb-2">Error Fetching Market Data</h2>
-                <p className="text-muted-foreground">{pageError}</p>
-                <p className="text-sm text-muted-foreground mt-2">Asset details could not be loaded.</p>
+                <h3 className="text-xl font-semibold text-destructive mb-2">Market Data Unavailable</h3>
+                <p className="text-muted-foreground">Asset details could not be loaded due to the API error.</p>
             </CardContent>
             </Card>
         )}
         {!pageError && (
             <AssetDataTable 
-                initialAssets={exchangeData?.assets ?? []} 
+                initialAssets={exchangeData.assets} 
                 exchangeName="Aster" 
             />
         )}
@@ -157,4 +182,3 @@ export default function AsterDexPage() {
     </div>
   );
 }
-
