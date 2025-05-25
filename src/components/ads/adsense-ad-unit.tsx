@@ -27,49 +27,65 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
   style,
   ...props
 }) => {
+  const adContainerRef = useRef<HTMLDivElement>(null);
   const pushedOnce = useRef(false);
 
   useEffect(() => {
+    // Don't proceed if placeholder IDs are used or if already pushed for this instance
+    if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
+      return;
+    }
     if (pushedOnce.current) {
       return;
     }
 
-    if (adSlotId && adClient && !adSlotId.startsWith("YOUR_") && !adClient.startsWith("ca-pub-YOUR_")) {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-        pushedOnce.current = true;
-      } catch (e) {
-        console.error(`AdSense push error for slot ${adSlotId}:`, e);
+    const timer = setTimeout(() => {
+      // Check if the component is still mounted and ref is available
+      if (adContainerRef.current) {
+        try {
+          if (window.adsbygoogle) {
+            (window.adsbygoogle = window.adsbygoogle || []).push({});
+            pushedOnce.current = true; // Mark as pushed
+          } else {
+            console.warn(`AdSense main script (adsbygoogle) not found when attempting to push ad for slot ${adSlotId}.`);
+          }
+        } catch (e) {
+          console.error(`AdSense push error for slot ${adSlotId}:`, e);
+        }
       }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once on mount
+    }, 100); // Delay of 100ms to allow layout to settle
+
+    return () => {
+      clearTimeout(timer); // Clean up the timer if the component unmounts
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array: run once after component mounts
 
   if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
-    // Do not render if slot or client ID is missing or is a placeholder
-    return null;
+    return null; // Don't render if slot or client ID is a placeholder
   }
 
   return (
     <div
+      ref={adContainerRef}
       className={className}
       style={{
-        display: 'block', // Ensure the div takes up space
+        display: 'block',
         textAlign: 'center',
-        minWidth: '100px',  // Provide a fallback minimum width
-        minHeight: '50px',   // Provide a fallback minimum height
+        minWidth: '100px', 
+        minHeight: '50px',  
         ...style,
       }}
       {...props}
     >
       <ins
         className="adsbygoogle"
-        style={{ display: 'block' }} // Standard for responsive ads
+        style={{ display: 'block' }}
         data-ad-client={adClient}
         data-ad-slot={adSlotId}
         data-ad-format={adFormat}
         data-full-width-responsive={responsive.toString()}
-        key={adSlotId} // Add key to the <ins> tag
+        key={adSlotId} // Using adSlotId as key can help React differentiate instances
       ></ins>
     </div>
   );
