@@ -2,12 +2,12 @@
 // src/app/asterdex/page.tsx
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import type { ExchangeAssetDetail } from '@/types';
+import React from 'react';
+import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookWebSocketMessage } from '@/types';
 import { getAsterProcessedData } from '@/lib/aster-api';
 import { AssetDataTable } from '@/components/asset-data-table';
+import { CandlestickChart, ServerCrash, AlertTriangle } from 'lucide-react';
 import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
-import { CandlestickChart, AlertTriangle, ServerCrash } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit';
@@ -18,34 +18,32 @@ const ADSENSE_PUBLISHER_ID = "ca-pub-YOUR_PUBLISHER_ID";
 const MID_PAGE_AD_SLOT_ID_ASTERDEX = "YOUR_MID_PAGE_AD_SLOT_ID_ASTERDEX";
 const FOOTER_AD_SLOT_ID_ASTERDEX = "YOUR_FOOTER_AD_SLOT_ID_ASTERDEX";
 
-
+// HMR Recovery comment
 export default function AsterDexPage() {
   const [exchangeData, setExchangeData] = React.useState<{ assets: ExchangeAssetDetail[] }>({ assets: [] });
   const [isLoadingPageData, setIsLoadingPageData] = React.useState(true);
   const [pageError, setPageError] = React.useState<string | null>(null);
-  // Removed Order Book related state and ref
 
-  useEffect(() => {
+  React.useEffect(() => {
     async function loadInitialData() {
       setIsLoadingPageData(true);
       setPageError(null);
-
       try {
         const processedData = await getAsterProcessedData();
         if (processedData && processedData.assets) {
           setExchangeData({ assets: processedData.assets });
-          if (processedData.assets.length === 0) {
-             console.warn("AsterDex: No assets returned from getAsterProcessedData.");
+           if (processedData.assets.length === 0) {
+             console.warn("AsterDex: No assets returned from getAsterProcessedData for page display.");
           }
         } else {
            console.error("Failed to load critical AsterDex data in page component.");
            setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-           setExchangeData({ assets: [] });
+           setExchangeData({ assets: [] }); // Ensure assets is an empty array on error
         }
       } catch (error: any) {
         console.error("Error loading initial AsterDex page data:", error);
-        setPageError(error.message || "Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ assets: [] });
+        setPageError(error.message || "An error occurred while fetching exchange data.");
+        setExchangeData({ assets: [] }); // Ensure assets is an empty array on error
       } finally {
         setIsLoadingPageData(false);
       }
@@ -70,6 +68,7 @@ export default function AsterDexPage() {
     );
   }
 
+
   return (
     <div className="space-y-8">
       <header className="pb-4 mb-6 border-b">
@@ -77,7 +76,7 @@ export default function AsterDexPage() {
           <CandlestickChart className="h-8 w-8 text-primary" />
           AsterDex Exchange
         </h1>
-        <p className="text-muted-foreground mt-1">Live market data and account overview for AsterDex.</p>
+        <p className="text-muted-foreground mt-1">Live market data and account overview.</p>
       </header>
 
       {pageError && !isLoadingPageData && (
@@ -102,8 +101,6 @@ export default function AsterDexPage() {
       </section>
 
       <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={MID_PAGE_AD_SLOT_ID_ASTERDEX} className="my-8" />
-
-      {/* Removed Order Book Display Section */}
 
       <section>
         <h2 className="text-xl font-semibold tracking-tight mt-8 mb-3">Market Asset Details</h2>

@@ -37,15 +37,26 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
     }
   }, [adSlotId, adClient]);
 
-  if (!adSlotId || !adClient) {
-    return null; // Don't render anything if slot or client ID is missing
+  if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
+    // Do not render if slot or client ID is missing or is a placeholder
+    return null; 
   }
 
   return (
-    <div className={className} style={{ textAlign: 'center', ...style }} {...props}>
+    <div
+      className={className}
+      style={{
+        display: 'block', // Ensure the div takes up space
+        textAlign: 'center',
+        minWidth: '100px',  // Provide a fallback minimum width
+        minHeight: '50px',   // Provide a fallback minimum height
+        ...style,
+      }}
+      {...props}
+    >
       <ins
         className="adsbygoogle"
-        style={{ display: 'block' }}
+        style={{ display: 'block' }} // Standard for responsive ads
         data-ad-client={adClient}
         data-ad-slot={adSlotId}
         data-ad-format={adFormat}
