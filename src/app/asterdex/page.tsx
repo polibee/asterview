@@ -1,72 +1,61 @@
+
 // src/app/asterdex/page.tsx
 'use client';
 
 import React from 'react';
-// import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api'; // Combined getAsterProcessedData
 import { getAsterProcessedData, fetchAsterOrderBook } from '@/lib/aster-api';
-import type { ExchangeAssetDetail, ExchangeData, AsterOrderBookData } from '@/types';
+import type { ExchangeAssetDetail, AsterOrderBookData } from '@/types';
 import { AssetDataTable } from '@/components/asset-data-table';
-// import { LongShortRatioDisplay } from '@/components/long-short-ratio-display'; // Aster doesn't have this
 import { OrderBookDisplay } from '@/components/order-book-display';
 import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
 import { CandlestickChart, AlertTriangle, ServerCrash } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+// HMR recovery attempt: adding a comment
 
 export default function AsterDexPage() {
-  // State for initial page data (assets for the table)
-  const [exchangeData, setExchangeData] = React.useState<Partial<ExchangeData>>({ name: 'Aster', metrics: null, assets: [] });
-
-  // State for order book
+  const [exchangeData, setExchangeData] = React.useState<{ assets: ExchangeAssetDetail[] }>({ assets: [] });
   const [orderBook, setOrderBook] = React.useState<AsterOrderBookData | null>(null);
   const [selectedSymbolForOrderBook, setSelectedSymbolForOrderBook] = React.useState<string | null>(null);
-  const [isLoadingOrderBook, setIsLoadingOrderBook] = React.useState(false);
-
-  // General page loading and error states
   const [isLoadingPageData, setIsLoadingPageData] = React.useState(true);
+  const [isLoadingOrderBook, setIsLoadingOrderBook] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
 
-  // Effect for loading initial asset data for the AssetDataTable
   React.useEffect(() => {
     async function loadInitialData() {
-      // This guard helps prevent re-fetching if data is already present from a successful load
       if (exchangeData.assets && exchangeData.assets.length > 0 && !pageError && !isLoadingPageData) {
         return;
       }
-
       setIsLoadingPageData(true);
-      setPageError(null); // Clear previous errors
+      setPageError(null);
 
       try {
         const processedData = await getAsterProcessedData();
         if (processedData && processedData.assets) {
-          setExchangeData({ name: 'Aster', metrics: processedData.metrics, assets: processedData.assets });
+          setExchangeData({ assets: processedData.assets });
           if (processedData.assets.length > 0 && processedData.assets[0]?.id) {
             setSelectedSymbolForOrderBook(processedData.assets[0].id);
           } else if (processedData.assets.length === 0) {
              console.warn("AsterDex: No assets returned from getAsterProcessedData.");
           }
         } else {
-           // This means getAsterProcessedData indicated a critical failure (e.g. by returning metrics: null)
            console.warn("Failed to load critical AsterDex data in page component.");
            setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-           setExchangeData({ name: 'Aster', metrics: null, assets: [] });
+           setExchangeData({ assets: [] });
         }
       } catch (error: any) {
         console.error("Error loading initial AsterDex page data:", error);
         setPageError(error.message || "Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
-        setExchangeData({ name: 'Aster', metrics: null, assets: [] });
+        setExchangeData({ assets: [] });
       } finally {
         setIsLoadingPageData(false);
       }
     }
-
     loadInitialData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Runs once on mount to fetch initial data
+  }, []);
 
-  // Effect for loading order book data when selectedSymbolForOrderBook changes or pageError is cleared
   React.useEffect(() => {
     if (pageError || !selectedSymbolForOrderBook) {
       setOrderBook(null);
@@ -76,20 +65,19 @@ export default function AsterDexPage() {
 
     async function loadOrderBook() {
       setIsLoadingOrderBook(true);
-      setOrderBook(null); // Clear previous order book data
+      setOrderBook(null);
       try {
-        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook!, 50); // Fetching 50 levels
+        const obData = await fetchAsterOrderBook(selectedSymbolForOrderBook!, 15); // Fetching 15 levels for consistency
         setOrderBook(obData);
       } catch (error) {
         console.warn(`Error loading AsterDex order book for ${selectedSymbolForOrderBook}:`, error);
-        setOrderBook(null); // Set to null on error to clear display
+        setOrderBook(null);
       } finally {
         setIsLoadingOrderBook(false);
       }
     }
-
     loadOrderBook();
-  }, [selectedSymbolForOrderBook, pageError]); // Re-run if selected symbol changes or pageError is resolved
+  }, [selectedSymbolForOrderBook, pageError]);
 
   const availableSymbolsForOrderBook = React.useMemo(() => {
     return exchangeData.assets?.map(asset => ({ id: asset.id, name: asset.symbol })) || [];
@@ -119,7 +107,7 @@ export default function AsterDexPage() {
           <CandlestickChart className="h-8 w-8 text-primary" />
           AsterDex Exchange
         </h1>
-        <p className="text-muted-foreground mt-1">Detailed market data and account overview for AsterDex.</p>
+        <p className="text-muted-foreground mt-1">Live market data, order book, and account overview for AsterDex.</p>
       </header>
 
       {pageError && !isLoadingPageData && (
@@ -139,7 +127,6 @@ export default function AsterDexPage() {
       )}
 
       <section>
-        {/* The AsterdexAccountCenter component has its own internal title */}
         <h2 className="text-xl font-semibold tracking-tight mb-3 sr-only">Account Center</h2>
         <AsterdexAccountCenter />
       </section>
