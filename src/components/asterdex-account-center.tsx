@@ -14,7 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import {
   fetchAsterAccountBalances,
   fetchAsterAccountInfo,
-  fetchAsterPositions,
+  fetchAsterPositions, // This specific function might be redundant if accInfo has positions
   fetchAsterCommissionRate,
   fetchAsterUserTrades,
   createAsterListenKey,
@@ -96,9 +96,9 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, description, icon
   );
 };
 
-const LOCAL_STORAGE_KEY = 'asterAccountSummaryData_v2';
+const LOCAL_STORAGE_KEY = 'asterAccountSummaryData_v3'; // Incremented version due to data structure changes
 const DATA_STALE_MS = 5 * 60 * 1000; // 5 minutes
-const DEFAULT_COMMISSION_SYMBOL = 'BTCUSDT'; // Default symbol for fetching trades and commission
+const DEFAULT_COMMISSION_SYMBOL = 'BTCUSDT'; // Default symbol for fetching commission
 
 export function AsterdexAccountCenter() {
   const [apiKey, setApiKey] = useState('');
@@ -126,6 +126,7 @@ export function AsterdexAccountCenter() {
       balances: [], accountInfo: undefined, positions: [], userTrades: [],
       webSocketStatus: status,
       lastUpdated: 0,
+      longTrades: null, shortTrades: null, longVolume: null, shortVolume: null, latestFee: null,
     });
   };
 
@@ -161,12 +162,17 @@ export function AsterdexAccountCenter() {
       return {
         totalRealizedPNL: 0, totalTrades: 0, totalVolume: 0, totalFeesPaid: 0,
         todayVolumeAuBoost: 0, auTraderBoost: "1x (Base)", rhPointsTotal: 0,
+        longTrades: 0, shortTrades: 0, longVolume: 0, shortVolume: 0, latestFee: null,
       };
     }
 
     let totalRealizedPNL = 0;
     let totalVolume = 0;
     let totalFeesPaid = 0;
+    let longTrades = 0;
+    let shortTrades = 0;
+    let longVolume = 0;
+    let shortVolume = 0;
     
     let todayTakerVolume = 0;
     let todayMakerVolume = 0;
@@ -174,47 +180,58 @@ export function AsterdexAccountCenter() {
     let allTradesTakerVolume = 0;
     let allTradesMakerVolume = 0;
 
-    // Calculate UTC day boundaries
     const now = new Date();
-    const yearUTC = now.getUTCFullYear();
-    const monthUTC = now.getUTCMonth(); // 0-11
-    const dayUTC = now.getUTCDate();
-    const currentDayUTCTimestampStart = Date.UTC(yearUTC, monthUTC, dayUTC, 0, 0, 0, 0);
-    const nextDayUTCTimestampStart = Date.UTC(yearUTC, monthUTC, dayUTC + 1, 0, 0, 0, 0);
+    const currentDayUTCTimestampStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0);
+    const nextDayUTCTimestampStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0);
+    
+    let latestFeeValue: number | null = null;
+    if (trades.length > 0) {
+        // Sort trades by time descending to get the latest one easily
+        const sortedTrades = [...trades].sort((a, b) => b.time - a.time);
+        const latestTradeCommission = parseFloatSafe(sortedTrades[0].commission);
+        if (latestTradeCommission !== null) {
+            latestFeeValue = Math.abs(latestTradeCommission);
+        }
+    }
 
 
     trades.forEach(trade => {
       const pnl = parseFloatSafe(trade.realizedPnl);
-      const quoteQty = parseFloatSafe(trade.quoteQty) ?? 0; // Value of the trade in quote asset
-      const commission = parseFloatSafe(trade.commission); // Assuming commission is negative
+      const quoteQty = parseFloatSafe(trade.quoteQty) ?? 0; 
+      const commission = parseFloatSafe(trade.commission); 
       const tradeTime = typeof trade.time === 'string' ? parseIntSafe(trade.time) : trade.time;
 
       if (pnl !== null) totalRealizedPNL += pnl;
       totalVolume += quoteQty;
-      if (commission !== null) totalFeesPaid += Math.abs(commission); // Store as positive value
+      if (commission !== null) totalFeesPaid += Math.abs(commission); 
 
-      // Today's Volume (for Au Boost) based on UTC day
+      if (trade.side === 'BUY') {
+        longTrades++;
+        longVolume += quoteQty;
+      } else if (trade.side === 'SELL') {
+        shortTrades++;
+        shortVolume += quoteQty;
+      }
+
       if (tradeTime && tradeTime >= currentDayUTCTimestampStart && tradeTime < nextDayUTCTimestampStart) {
-        if (trade.maker === false) { // Taker
+        if (trade.maker === false) { 
           todayTakerVolume += quoteQty;
-        } else { // Maker
+        } else { 
           todayMakerVolume += quoteQty;
         }
       }
 
-      // All (fetched) trades volume for Rh Points
-      if (trade.maker === false) { // Taker
+      if (trade.maker === false) { 
           allTradesTakerVolume += quoteQty;
-      } else { // Maker
+      } else { 
           allTradesMakerVolume += quoteQty;
       }
     });
 
     const todayVolumeAuBoostCalc = todayTakerVolume + (todayMakerVolume * 0.5);
 
-    let auTraderBoostFactor = "1x (Base)"; // Default, meaning no additional boost from trading volume
+    let auTraderBoostFactor = "1x (Base)"; 
     // Based on "Au Trader Boost Tiers (Adjust on 12 May)" from docs/asterpoint.md
-    // This table shows the total multiplier. So if <10k, it's effectively 1x.
     if (todayVolumeAuBoostCalc >= 500000) auTraderBoostFactor = "3x";
     else if (todayVolumeAuBoostCalc >= 200000) auTraderBoostFactor = "2.6x";
     else if (todayVolumeAuBoostCalc >= 50000) auTraderBoostFactor = "2.4x";
@@ -231,6 +248,8 @@ export function AsterdexAccountCenter() {
       todayVolumeAuBoost: todayVolumeAuBoostCalc,
       auTraderBoost: auTraderBoostFactor,
       rhPointsTotal: rhPointsTotalCalc,
+      longTrades, shortTrades, longVolume, shortVolume,
+      latestFee: latestFeeValue
     };
   };
 
@@ -238,7 +257,7 @@ export function AsterdexAccountCenter() {
   const loadAccountData = useCallback(async (forceRefresh = false) => {
     if (!apiKey || !secretKey) {
       setError("API Key and Secret Key are required.");
-      resetAccountDataToDefaults();
+      resetAccountDataToDefaults('Disconnected'); // Pass current status
       saveAccountDataToLocalStorage(null);
       return;
     }
@@ -253,6 +272,7 @@ export function AsterdexAccountCenter() {
             setAccountData(cachedData);
             setIsLoading(false); 
             loadedFromCache = true;
+            // console.log("Loaded account data from cache.");
             if (Date.now() - (cachedData.lastUpdated || 0) > 60 * 1000) { 
                  // console.log("Refreshing cached data in background...");
             } else {
@@ -262,18 +282,26 @@ export function AsterdexAccountCenter() {
     }
 
     try {
-      const [balances, accInfo, positions, commissionInfo, userTradesResponse] = await Promise.all([
+      const [balances, accInfo, commissionInfoResp] = await Promise.all([
         fetchAsterAccountBalances(apiKey, secretKey),
         fetchAsterAccountInfo(apiKey, secretKey),
-        fetchAsterPositions(apiKey, secretKey), // Fetches all positions. Can specify symbol if needed.
         fetchAsterCommissionRate(apiKey, secretKey, DEFAULT_COMMISSION_SYMBOL),
-        fetchAsterUserTrades(apiKey, secretKey, DEFAULT_COMMISSION_SYMBOL, 200) // Fetch last 200 trades for default symbol
       ]);
+      
+      const commissionInfo = commissionInfoResp;
+
+      const activePositions = accInfo.positions.filter(p => parseFloatSafe(p.positionAmt) !== 0);
+      const tradeFetchPromises = activePositions.map(p => 
+        fetchAsterUserTrades(apiKey, secretKey, p.symbol, 100) // Fetch last 100 trades per active symbol
+      );
+      const tradesBySymbol = await Promise.all(tradeFetchPromises);
+      const allUserTrades = tradesBySymbol.flat();
+
 
       const portfolioValue = parseFloatSafe(accInfo.totalMarginBalance);
       const totalUnrealizedPNL = parseFloatSafe(accInfo.totalUnrealizedProfit);
-      const userTrades = userTradesResponse || [];
-      const tradeMetrics = calculateTradeMetrics(userTrades);
+      
+      const tradeMetrics = calculateTradeMetrics(allUserTrades);
 
       const newAccountData: AsterAccountSummaryData = {
         portfolioValue,
@@ -286,14 +314,19 @@ export function AsterdexAccountCenter() {
         commissionRateTaker: commissionInfo?.takerCommissionRate ?? null,
         commissionSymbol: commissionInfo?.symbol ?? DEFAULT_COMMISSION_SYMBOL,
         todayVolumeAuBoost: tradeMetrics.todayVolumeAuBoost ?? null,
-        auTraderBoost: tradeMetrics.auTraderBoost ?? null,
+        auTraderBoost: tradeMetrics.auTraderBoost ?? "1x (Base)",
         rhPointsTotal: tradeMetrics.rhPointsTotal ?? null,
         balances: balances || [],
         accountInfo: accInfo,
-        positions: positions || [],
-        userTrades: userTrades,
+        positions: accInfo.positions || [], // Use positions from accountInfo
+        userTrades: allUserTrades,
         webSocketStatus: accountData?.webSocketStatus || 'Disconnected',
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        longTrades: tradeMetrics.longTrades,
+        shortTrades: tradeMetrics.shortTrades,
+        longVolume: tradeMetrics.longVolume,
+        shortVolume: tradeMetrics.shortVolume,
+        latestFee: tradeMetrics.latestFee
       };
       setAccountData(newAccountData);
       saveAccountDataToLocalStorage(newAccountData);
@@ -325,7 +358,8 @@ export function AsterdexAccountCenter() {
     } else {
       resetAccountDataToDefaults(); 
     }
-  }, [loadAccountData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Load keys on mount only
 
 
   useEffect(() => {
@@ -335,7 +369,7 @@ export function AsterdexAccountCenter() {
         wsRef.current = null;
       }
       setWebSocketStatus('Disconnected');
-      if (listenKey && apiKey) { // Use old apiKey for deletion if it existed
+      if (listenKey && apiKey) { 
          deleteAsterListenKey(apiKey, listenKey).catch(e => console.error("Error deleting old listen key:", e));
          setListenKey(null);
       }
@@ -347,7 +381,7 @@ export function AsterdexAccountCenter() {
     }
 
     let currentWs: WebSocket | null = null;
-    let localListenKeyAttempt = listenKey; // Use current listenKey if available
+    let localListenKeyAttempt = listenKey; 
 
     const connectWebSocket = async () => {
       setWebSocketStatus('Connecting');
@@ -358,7 +392,7 @@ export function AsterdexAccountCenter() {
             throw new Error("Failed to create listen key for WebSocket.");
             }
             localListenKeyAttempt = keyData.listenKey;
-            setListenKey(localListenKeyAttempt); // Set state here
+            setListenKey(localListenKeyAttempt); 
         }
 
         currentWs = new WebSocket(`wss://fstream.asterdex.com/ws/${localListenKeyAttempt}`);
@@ -374,13 +408,11 @@ export function AsterdexAccountCenter() {
               } catch (e) {
                 console.error("Failed to keep alive listenKey:", e);
                 currentWs?.close(); 
-                setListenKey(null); // Invalidate key
+                setListenKey(null); 
                 localListenKeyAttempt = null;
-                // Attempt to reconnect which will fetch a new key
-                // setTimeout(() => connectWebSocket(), 5000); // Avoid rapid loops
               }
             }
-          }, 30 * 60 * 1000); // 30 minutes
+          }, 30 * 60 * 1000); 
         };
 
         currentWs.onmessage = (event) => {
@@ -449,9 +481,9 @@ export function AsterdexAccountCenter() {
                          }
                     });
                     
-                    const usdtAsset = newAccountInfo.assets.find(a => a.asset === 'USDT'); // Assuming USDT is primary quote asset
+                    const usdtAsset = newAccountInfo.assets.find(a => a.asset === 'USDT'); 
                     if (usdtAsset) {
-                        newAccountInfo.totalMarginBalance = usdtAsset.marginBalance; // Or walletBalance based on Aster's definition
+                        newAccountInfo.totalMarginBalance = usdtAsset.marginBalance; 
                         newPortfolioValue = parseFloatSafe(usdtAsset.marginBalance);
                     }
                     
@@ -474,18 +506,14 @@ export function AsterdexAccountCenter() {
                 return updatedData;
               });
             } else if (typedMessage.e === 'ORDER_TRADE_UPDATE') {
-                // For more accurate PNL and trade volume updates, would need to:
-                // 1. Potentially re-fetch recent trades (could hit rate limits if too frequent)
-                // 2. Or, maintain a client-side list of trades and update it with the new trade, then recalculate.
-                // For now, we'll trigger a full REST refresh to simplify, but this is not optimal for high frequency.
                  // console.log("Order update received, triggering REST data refresh for trade-dependent metrics.");
-                 loadAccountData(true); 
+                 loadAccountData(true); // Re-fetch trade-dependent metrics
             } else if (typedMessage.e === 'listenKeyExpired') {
                 console.warn("ListenKey expired via WebSocket. Attempting to reconnect.");
                 if (wsRef.current) wsRef.current.close();
                 setListenKey(null); 
                 localListenKeyAttempt = null;
-                connectWebSocket(); // Reconnect will fetch a new key
+                connectWebSocket(); 
             }
 
           } catch (e) {
@@ -505,12 +533,6 @@ export function AsterdexAccountCenter() {
           }
           if (wsRef.current && wsRef.current === event.target) { 
             setWebSocketStatus(event.code === 1000 ? 'Disconnected' : 'Error');
-             // if (isApiKeysSet && event.code !== 1000 && apiKey && secretKey) {
-             //   console.log("WebSocket closed unexpectedly, attempting to reconnect...");
-             //   localListenKeyAttempt = null; // Force new key fetch
-             //   setListenKey(null);
-             //   setTimeout(() => connectWebSocket(), 5000); 
-             // }
           }
         };
 
@@ -610,7 +632,9 @@ export function AsterdexAccountCenter() {
     return pnl > 0 ? 'positive' : 'negative';
   };
 
-  const tradesNote = `Based on last ${accountData?.userTrades?.length || 0} trades for ${accountData?.commissionSymbol || DEFAULT_COMMISSION_SYMBOL}. Not account-wide.`;
+  const tradesNote = `Based on last ${accountData?.userTrades?.length || 0} trades across symbols with active positions. Not account-wide total.`;
+  const latestFeeText = accountData?.latestFee !== null && accountData?.latestFee !== undefined ? `Latest fee: ${formatUsd(accountData.latestFee, 6)}` : '';
+
 
   return (
     <div className="space-y-6">
@@ -701,7 +725,7 @@ export function AsterdexAccountCenter() {
               value={formatUsd(accountData?.portfolioValue ?? (isLoading && !accountData?.portfolioValue ? 0 : null))}
               description="Total margin balance (USDT)"
               icon={DollarSign}
-              isLoading={isLoading && !accountData?.portfolioValue}
+              isLoading={isLoading && accountData?.portfolioValue === null}
               className="lg:col-span-1"
             />
             <MetricCard
@@ -709,7 +733,7 @@ export function AsterdexAccountCenter() {
               value={formatUsd(accountData?.totalUnrealizedPNL ?? (isLoading && !accountData?.totalUnrealizedPNL ? 0 : null))}
               description="Live PNL on open positions (USDT)"
               icon={TrendingDown}
-              isLoading={isLoading && !accountData?.totalUnrealizedPNL}
+              isLoading={isLoading && accountData?.totalUnrealizedPNL === null}
               variant={getPnlVariant(accountData?.totalUnrealizedPNL)}
             />
             <MetricCard
@@ -729,7 +753,7 @@ export function AsterdexAccountCenter() {
             <MetricCard
               title="Total Realized PNL"
               value={formatUsd(accountData?.totalRealizedPNL)}
-              description={tradesNote}
+              description={`Based on last ${accountData?.userTrades?.length || 0} trades across symbols with active positions. Not account-wide total.`}
               icon={TrendingUp}
               isLoading={isLoading && accountData?.totalRealizedPNL === null}
               variant={getPnlVariant(accountData?.totalRealizedPNL)}
@@ -737,35 +761,47 @@ export function AsterdexAccountCenter() {
             <MetricCard
               title="Total Trades"
               value={formatNumber(accountData?.totalTrades)}
-              description={tradesNote}
+              description={<>
+                Long: {formatNumber(accountData?.longTrades)} | Short: {formatNumber(accountData?.shortTrades)}
+                <br/>
+                Based on last {accountData?.userTrades?.length || 0} trades across active symbols.
+              </>}
               icon={ListChecks}
               isLoading={isLoading && accountData?.totalTrades === null}
             />
             <MetricCard
               title="Total Volume"
               value={formatUsd(accountData?.totalVolume)}
-              description={tradesNote}
+              description={<>
+                Long: {formatUsd(accountData?.longVolume, 2)} | Short: {formatUsd(accountData?.shortVolume, 2)}
+                <br/>
+                Based on last {accountData?.userTrades?.length || 0} trades across active symbols.
+              </>}
               icon={BarChart3}
               isLoading={isLoading && accountData?.totalVolume === null}
             />
             <MetricCard
               title="Total Fees Paid"
-              value={formatUsd(accountData?.totalFeesPaid)}
-              description={tradesNote}
+              value={formatUsd(accountData?.totalFeesPaid, 4)}
+              description={<>
+                {latestFeeText}
+                <br/>
+                Based on last {accountData?.userTrades?.length || 0} trades across active symbols.
+              </>}
               icon={Landmark}
               isLoading={isLoading && accountData?.totalFeesPaid === null}
             />
             <MetricCard
               title="Today's Volume (Au Boost)"
               value={formatUsd(accountData?.todayVolumeAuBoost)}
-              description={<>Pro Taker + 0.5*Maker (Today UTC, <br/> {accountData?.commissionSymbol || DEFAULT_COMMISSION_SYMBOL} only)</>}
+              description="Pro Taker + 0.5*Maker (Today UTC, across active symbols)"
               icon={Zap}
               isLoading={isLoading && accountData?.todayVolumeAuBoost === null}
             />
             <MetricCard
               title="Au Trader Boost"
-              value={accountData?.auTraderBoost || (isLoading && accountData?.auTraderBoost === null ? "Loading..." : "N/A")}
-              description={<>Based on Today's Volume (before other boosts, <br/>{accountData?.commissionSymbol || DEFAULT_COMMISSION_SYMBOL} only)</>}
+              value={accountData?.auTraderBoost || (isLoading && accountData?.auTraderBoost === null ? "Loading..." : "1x (Base)")}
+              description="Multiplier based on Today's Volume. '1x (Base)' = no additional boost."
               icon={ArrowUpRightSquare}
               isLoading={isLoading && accountData?.auTraderBoost === null}
             />
@@ -775,7 +811,7 @@ export function AsterdexAccountCenter() {
              <MetricCard
               title="Rh Points (Base)"
               value={formatNumber(accountData?.rhPointsTotal)}
-              description={<>Base Rh from last {accountData?.userTrades?.length || 0} trades for {accountData?.commissionSymbol || DEFAULT_COMMISSION_SYMBOL}.<br/>Excludes team/referral/other boosts.</>}
+              description={`Base Rh from last ${accountData?.userTrades?.length || 0} trades across active symbols. Excludes team/referral/other boosts.`}
               icon={Trophy}
               isLoading={isLoading && accountData?.rhPointsTotal === null}
             />
@@ -791,9 +827,9 @@ export function AsterdexAccountCenter() {
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground space-y-1.5">
           <p><strong className="text-foreground">Data Caching:</strong> Core account summary is cached in your browser (localStorage) for 5 minutes. Data is refreshed via REST API in the background or on interaction if cache is stale.</p>
-          <p><strong className="text-foreground">Trade-Based Metrics:</strong> Realized PNL, Total Trades, Volume, Fees, and Points Program values are calculated from the <strong className="text-foreground">last {accountData?.userTrades?.length || 200} trades fetched for the symbol {accountData?.commissionSymbol || DEFAULT_COMMISSION_SYMBOL} only</strong>. These are not account-wide historical totals.</p>
-          <p><strong className="text-foreground">Au Points:</strong> "Au Trader Boost" factor shown is derived from "Today's Volume (Au Boost)" for the specified symbol, based on AsterDex documentation. Actual Au Points depend on other factors like "Earn Asset" holdings (not shown here) and overall account activity.</p>
-          <p><strong className="text-foreground">Rh Points:</strong> "Rh Points (Base)" are calculated from the fetched trades (Taker Vol + 0.5 \* Maker Vol) for the specified symbol. This does not include team boosts, user-specific Rh boosts, or referral bonuses.</p>
+          <p><strong className="text-foreground">Trade-Based Metrics:</strong> Realized PNL, Total Trades, Volume, Fees, and Points Program values are calculated from recent trades (approx. last 100 per symbol) fetched for symbols with active positions only. These are not account-wide historical totals.</p>
+          <p><strong className="text-foreground">Au Points:</strong> "Au Trader Boost" factor shown is derived from "Today's Volume (Au Boost)" (Pro Taker + 0.5\*Maker, Today UTC) across active symbols, based on AsterDex documentation. Actual Au Points depend on other factors like "Earn Asset" holdings (not shown here) and overall account activity.</p>
+          <p><strong className="text-foreground">Rh Points:</strong> "Rh Points (Base)" are calculated from fetched trades (Taker Vol + 0.5 \* Maker Vol) across active symbols. This does not include team boosts, user-specific Rh boosts, or referral bonuses.</p>
           <p><strong className="text-foreground">Real-time Updates:</strong> After initial load, balances and positions are updated via WebSocket. Trade-derived metrics currently update on full REST refresh when a new trade is detected via WebSocket, or on manual refresh / stale cache.</p>
           <p><strong className="text-foreground">API Limits:</strong> Note: AsterDex API has a general limit of 2400 requests/minute. This component fetches key data on load and uses WebSockets for live balance/position updates to minimize REST calls. For comprehensive historical analytics, a backend data aggregation solution is recommended.</p>
         </CardContent>
