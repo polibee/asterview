@@ -14,14 +14,14 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare, BookOpen } from 'lucide-react';
+import { ArrowUpDown, Search, Info, Percent, CalendarClock, TrendingUp, TrendingDown, Target, GanttChartSquare, BookOpen, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, fromUnixTime } from 'date-fns';
 
-
+// HMR Recovery comment
 interface AssetDataTableProps {
   initialAssets: ExchangeAssetDetail[] | null;
-  exchangeName: 'Aster' | 'EdgeX';
+  exchangeName: 'Aster'; // Only Aster is supported now
 }
 
 type SortKey = keyof ExchangeAssetDetail | '';
@@ -126,40 +126,24 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
 
 
   useEffect(() => {
-    if (!isClient || internalAssets.length === 0) return;
+    if (!isClient || internalAssets.length === 0 || exchangeName !== 'Aster') return;
 
-    const endpoint = exchangeName === 'Aster'
-        ? 'wss://fstream.asterdex.com/stream?streams=!ticker@arr'
-        : 'wss://pro.edgex.exchange/api/v1/public/ws';
-
+    const endpoint = 'wss://fstream.asterdex.com/stream?streams=!ticker@arr';
     const ws = new WebSocket(endpoint);
 
     ws.onopen = () => {
-      if (exchangeName === 'EdgeX') {
-        ws.send(JSON.stringify({ type: "subscribe", channel: "ticker.all" }));
-      }
+      // console.log(`${exchangeName} price WebSocket connected`);
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data as string);
-
         let priceUpdates: { id: string, price: number }[] = [];
 
-        if (exchangeName === 'Aster' && message.stream === '!ticker@arr' && Array.isArray(message.data)) {
+        if (message.stream === '!ticker@arr' && Array.isArray(message.data)) {
           priceUpdates = message.data.map((ticker: any) => ({
             id: ticker.s,
             price: parseFloatSafe(ticker.c) ?? 0
-          }));
-        } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Changed" && Array.isArray(message.content?.data) ) {
-           priceUpdates = message.content.data.map((ticker: any) => ({
-            id: ticker.contractId,
-            price: parseFloatSafe(ticker.lastPrice) ?? 0
-          }));
-        } else if (exchangeName === 'EdgeX' && message.type === 'payload' && message.channel === 'ticker.all' && message.content?.dataType === "Snapshot" && Array.isArray(message.content?.data) ) {
-          priceUpdates = message.content.data.map((ticker: any) => ({
-            id: ticker.contractId,
-            price: parseFloatSafe(ticker.lastPrice) ?? 0
           }));
         }
 
@@ -177,7 +161,6 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             return updated ? newAssets : prevAssets;
           });
         }
-
       } catch (error) {
         // console.error(`${exchangeName} WebSocket error processing message:`, error);
       }
@@ -294,8 +277,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       <CardContent className="p-0 h-[600px] overflow-y-auto">
         <Table className="min-w-full">
           <TableHeader className="sticky top-0 z-20 shadow-sm bg-card">
-            <TableRow>
-              {columns.map((col, colIndex) => (
+            <TableRow>{columns.map((col, colIndex) => (
                 <TableHead
                   key={col.key || col.label}
                   className={cn(
@@ -309,8 +291,8 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                   style={{ 
                       left: col.sticky === 'left' ? col.stickyOffset : undefined, 
                       minWidth: col.minWidth,
-                      width: col.width, // Apply explicit width if defined
-                      backgroundColor: 'hsl(var(--card))', // Ensure opaque background for sticky header cells
+                      width: col.width,
+                      backgroundColor: 'hsl(var(--card))',
                   }}
                   onClick={() => col.key && handleSort(col.key)}
                 >
@@ -320,8 +302,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     {col.key && renderSortIcon(col.key)}
                   </div>
                 </TableHead>
-              ))}
-            </TableRow>
+              ))}</TableRow>
           </TableHeader>
           <TableBody>
             {sortedAndFilteredData.length > 0 ? sortedAndFilteredData.map((item, index) => (
@@ -342,13 +323,13 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                       left: col.sticky === 'left' ? col.stickyOffset : undefined, 
                       backgroundColor: 'hsl(var(--card))', 
                       minWidth: col.minWidth,
-                      width: col.width, // Apply explicit width if defined
+                      width: col.width,
                      }}
                   >
                     {col.key === '' ? index + 1 :
                      col.key === 'symbol' ? (
                       <div className="flex items-center gap-2">
-                        {item.iconUrl && <Image data-ai-hint={`${item.symbol?.replace(/USDT$/, '').replace(/PERP$/, '') || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol || 'asset icon'} width={18} height={18} className="rounded-full shrink-0" />}
+                        {item.iconUrl && <Image data-ai-hint={`${item.symbol?.replace(/USDT$/, '').replace(/PERP$/, '').substring(0,10) || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol || 'asset icon'} width={18} height={18} className="rounded-full shrink-0" />}
                         <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
                       </div>
                      ) :
@@ -380,7 +361,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       </CardContent>
        {(initialAssets && initialAssets.length > 0 && sortedAndFilteredData.length > 0) && (
          <div className="p-3 text-xs text-muted-foreground border-t">
-           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Price is updated in real-time. Other metrics update on page load.
+           Showing {sortedAndFilteredData.length} of {internalAssets.length} assets. Price is updated in real-time. Other metrics update on page load or main account refresh.
          </div>
        )}
     </Card>
