@@ -1,4 +1,5 @@
 
+
 export interface MarketData {
   id: string;
   symbol: string; // e.g., "BTC/USD"
@@ -262,7 +263,7 @@ export interface ExchangeAssetDetail {
   symbol: string;
   price: number;
   dailyVolume: number;
-  baseAssetVolume24h?: number; // Volume in base asset
+  baseAssetVolume24h?: number; 
   openInterest: number;
   dailyTrades: number;
   fundingRate: number | null;
@@ -312,7 +313,7 @@ export interface AsterAccountSummaryData {
   previousDayVolumeAuBoost: number; 
   auTraderBoost: string | null; 
   rhPointsTotal: number;
-  todayTotalVolume: number; // New field for today's total volume
+  todayTotalVolume: number;
   balances?: AsterAccountBalanceV2[];
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
@@ -330,4 +331,77 @@ export interface CachedSymbolTrades {
 
 export interface AllCachedTrades {
     [symbol: string]: CachedSymbolTrades;
+}
+
+// EdgeX Types (Minimal stubs as it's removed)
+export interface EdgeXContract {
+  contractId: string;
+  contractName: string;
+  baseCoinId?: string;
+  quoteCoinId?: string;
+  starkExSyntheticAssetId?: string; // for icon placeholder
+}
+
+export interface EdgeXCoin {
+  coinId: string;
+  coinName: string;
+  iconUrl?: string;
+}
+
+export interface EdgeXMetaData {
+  contractList: EdgeXContract[];
+  coinList: EdgeXCoin[];
+}
+
+export interface EdgeXTicker {
+  contractId: string;
+  lastPrice?: string;
+  priceChangePercent?: string;
+  high?: string;
+  low?: string;
+  size?: string; // base asset volume
+  value?: string; // quote asset volume
+  trades?: string;
+  openInterest?: string;
+  indexPrice?: string;
+  oraclePrice?: string;
+  fundingRate?: string;
+  nextFundingTime?: string;
+}
+
+export interface EdgeXLongShortRatioItem {
+  range: string;
+  contractId: string; // Usually "_total_" for overall
+  exchange: string;
+  buyRatio: string;
+  sellRatio: string;
+  buyVolUsd: string;
+  sellVolUsd: string;
+}
+export interface EdgeXLongShortRatioData {
+  exchangeLongShortRatioList: EdgeXLongShortRatioItem[];
+  allRangeList: string[];
+}
+
+export type EdgeXOrderBookEntryRaw = { price: string; size: string };
+export interface EdgeXOrderBook {
+  startVersion: string;
+  endVersion: string;
+  level: number;
+  contractId: string;
+  asks: EdgeXOrderBookEntryRaw[];
+  bids: EdgeXOrderBookEntryRaw[];
+}
+
+export interface EdgeXFundingRateItem {
+  contractId: string;
+  fundingRate: string;
+  fundingTime: string; // timestamp string
+  indexPrice?: string;
+  markPrice?: string; // Not directly in this API, but might be in ticker
+  oraclePrice?: string;
+}
+
+export interface EdgeXLatestFundingRateResponse {
+    data: EdgeXFundingRateItem[];
 }
