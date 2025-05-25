@@ -7,7 +7,7 @@ import { LayoutDashboard } from 'lucide-react';
 import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit';
 
 // IMPORTANT: Replace with your actual AdSense Publisher ID
-const ADSENSE_PUBLISHER_ID = "ca-pub-YOUR_PUBLISHER_ID"; 
+const ADSENSE_PUBLISHER_ID = "ca-pub-8597282005680903"; 
 // IMPORTANT: Replace with your actual Ad Slot IDs
 const MID_PAGE_AD_SLOT_ID_OVERVIEW = "YOUR_MID_PAGE_AD_SLOT_ID_OVERVIEW";
 const FOOTER_AD_SLOT_ID_OVERVIEW = "YOUR_FOOTER_AD_SLOT_ID_OVERVIEW";
