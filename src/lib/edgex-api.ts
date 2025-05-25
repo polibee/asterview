@@ -35,7 +35,8 @@ export async function fetchEdgeXMetaData(): Promise<EdgeXMetaData | null> {
     const data: { data: EdgeXMetaData } = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Failed to fetch EdgeX metadata:', error);
+    // Log network-level fetch errors as warnings to differentiate from API error responses
+    console.warn('Failed to fetch EdgeX metadata (network/fetch error):', error);
     return null;
   }
 }
@@ -50,7 +51,7 @@ export async function fetchEdgeXAllTickers(): Promise<EdgeXTicker[]> {
     const data: { data: EdgeXTicker[] } = await response.json();
     return data.data;
   } catch (error) {
-    console.error('Failed to fetch EdgeX tickers:', error);
+    console.warn('Failed to fetch EdgeX tickers (network/fetch error):', error);
     return [];
   }
 }
@@ -69,7 +70,7 @@ export async function fetchEdgeXLatestFundingRates(): Promise<EdgeXFundingRateIt
     console.error('EdgeX getLatestFundingRate response not successful or data missing:', data);
     return [];
   } catch (error) {
-    console.error('Failed to fetch EdgeX latest funding rates:', error);
+    console.warn('Failed to fetch EdgeX latest funding rates (network/fetch error):', error);
     return [];
   }
 }
@@ -84,7 +85,7 @@ export async function fetchEdgeXLongShortRatio(range: string = "1h"): Promise<Ed
     }
     const result: { data: EdgeXLongShortRatioData } = await response.json();
     return result.data;
-  } catch (error) { // Catch network errors for fetch itself
+  } catch (error) { 
     console.warn(`Network error while fetching EdgeX long/short ratio for range ${range}:`, error);
     return null;
   }
@@ -107,10 +108,11 @@ export async function fetchEdgeXOrderBook(contractId: string, level: number = 15
 
 export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggregatedMetrics | null, assets: ExchangeAssetDetail[] }> {
   const metaData = await fetchEdgeXMetaData();
+  
   if (!metaData) {
-    // Metadata is critical. If it fails, we can't reliably process other data.
-    // fetchEdgeXMetaData already logs its own error.
-    console.warn("Critical EdgeX metadata could not be fetched. Returning empty data for EdgeX.");
+    // fetchEdgeXMetaData already logs its own error/warning.
+    // The page component will handle this by showing a page-level error.
+    console.warn("Critical EdgeX metadata could not be fetched. Returning empty data for EdgeX processing.");
     return { metrics: null, assets: [] };
   }
   
@@ -154,8 +156,7 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     let iconUrl = baseCoinInfo?.iconUrl;
     if (!iconUrl) {
       const baseCoinName = baseCoinInfo?.coinName || contractInfo.baseCoinId;
-      // Use a placeholder that hints at the asset if no icon found
-      const assetHint = (baseCoinInfo?.coinName || ticker.contractName.replace('USDT', '').replace('PERP', '') || 'N/A').substring(0,3).toUpperCase();
+      const assetHint = (baseCoinInfo?.coinName || ticker.contractName.replace(/USDT$/, '').replace(/PERP$/, '') || 'N/A').substring(0,3).toUpperCase();
       iconUrl = `https://placehold.co/32x32.png?text=${assetHint}`;
     }
     
@@ -189,3 +190,4 @@ export async function getEdgeXProcessedData(): Promise<{ metrics: ExchangeAggreg
     assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
+
