@@ -31,10 +31,15 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
   const pushedOnce = useRef(false);
 
   useEffect(() => {
-    // Don't proceed if placeholder IDs are used or if already pushed for this instance
+    // Don't proceed if placeholder IDs are used
     if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
+      if (adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
+        // console.warn(`AdSenseAdUnit: Placeholder adClient or adSlotId used for slot ${adSlotId}. Ad will not be rendered.`);
+      }
       return;
     }
+
+    // Don't push if already pushed for this instance
     if (pushedOnce.current) {
       return;
     }
@@ -70,17 +75,16 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
       ref={adContainerRef}
       className={className}
       style={{
-        display: 'block',
-        textAlign: 'center',
-        minWidth: '100px', 
-        minHeight: '50px',  
+        display: 'block', // Ensure the container is block-level
+        textAlign: 'center', // Center the ad if it's narrower than the container
+        // Removed explicit minWidth and minHeight to allow parent to dictate size
         ...style,
       }}
       {...props}
     >
       <ins
         className="adsbygoogle"
-        style={{ display: 'block' }}
+        style={{ display: 'block' }} // This style is recommended by AdSense for responsive ads
         data-ad-client={adClient}
         data-ad-slot={adSlotId}
         data-ad-format={adFormat}
