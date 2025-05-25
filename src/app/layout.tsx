@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 // IMPORTANT: Replace with your actual AdSense Publisher ID
-const ADSENSE_PUBLISHER_ID = "ca-pub-YOUR_PUBLISHER_ID"; 
+const ADSENSE_PUBLISHER_ID = "ca-pub-8597282005680903"; 
 // IMPORTANT: Replace with your actual Ad Slot IDs
 const HEADER_AD_SLOT_ID = "YOUR_HEADER_AD_SLOT_ID";
 
