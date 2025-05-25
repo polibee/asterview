@@ -219,6 +219,18 @@ export interface AsterListenKey {
   listenKey: string;
 }
 
+export interface AsterIncomeHistoryItem {
+    symbol: string;      // trade symbol, if existing
+    incomeType: "TRANSFER" | "WELCOME_BONUS" | "REALIZED_PNL" | "FUNDING_FEE" | "COMMISSION" | "INSURANCE_CLEAR" | "MARKET_MERCHANT_RETURN_REWARD" | string; // income type
+    income: string;      // income amount
+    asset: string;       // income asset
+    info: string;        // extra information
+    time: number;        
+    tranId: string;      // transaction id
+    tradeId: string;     // trade id, if existing
+}
+
+
 // --- Aster WebSocket User Data Stream Event Payloads ---
 export interface AsterWebSocketUpdateAccountDataBalance {
   a: string; // Asset
@@ -314,11 +326,14 @@ export interface AsterAccountSummaryData {
   auTraderBoost: string | null; 
   rhPointsTotal: number;
   todayTotalVolume: number;
+  totalFundingFees: number;
+  totalCommissions: number; // Specifically from income history
   balances?: AsterAccountBalanceV2[];
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
   webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
   lastUpdated?: number;
+  incomeHistory?: AsterIncomeHistoryItem[];
 }
 
 // For caching trades
@@ -331,77 +346,4 @@ export interface CachedSymbolTrades {
 
 export interface AllCachedTrades {
     [symbol: string]: CachedSymbolTrades;
-}
-
-// EdgeX Types (Minimal stubs as it's removed)
-export interface EdgeXContract {
-  contractId: string;
-  contractName: string;
-  baseCoinId?: string;
-  quoteCoinId?: string;
-  starkExSyntheticAssetId?: string; // for icon placeholder
-}
-
-export interface EdgeXCoin {
-  coinId: string;
-  coinName: string;
-  iconUrl?: string;
-}
-
-export interface EdgeXMetaData {
-  contractList: EdgeXContract[];
-  coinList: EdgeXCoin[];
-}
-
-export interface EdgeXTicker {
-  contractId: string;
-  lastPrice?: string;
-  priceChangePercent?: string;
-  high?: string;
-  low?: string;
-  size?: string; // base asset volume
-  value?: string; // quote asset volume
-  trades?: string;
-  openInterest?: string;
-  indexPrice?: string;
-  oraclePrice?: string;
-  fundingRate?: string;
-  nextFundingTime?: string;
-}
-
-export interface EdgeXLongShortRatioItem {
-  range: string;
-  contractId: string; // Usually "_total_" for overall
-  exchange: string;
-  buyRatio: string;
-  sellRatio: string;
-  buyVolUsd: string;
-  sellVolUsd: string;
-}
-export interface EdgeXLongShortRatioData {
-  exchangeLongShortRatioList: EdgeXLongShortRatioItem[];
-  allRangeList: string[];
-}
-
-export type EdgeXOrderBookEntryRaw = { price: string; size: string };
-export interface EdgeXOrderBook {
-  startVersion: string;
-  endVersion: string;
-  level: number;
-  contractId: string;
-  asks: EdgeXOrderBookEntryRaw[];
-  bids: EdgeXOrderBookEntryRaw[];
-}
-
-export interface EdgeXFundingRateItem {
-  contractId: string;
-  fundingRate: string;
-  fundingTime: string; // timestamp string
-  indexPrice?: string;
-  markPrice?: string; // Not directly in this API, but might be in ticker
-  oraclePrice?: string;
-}
-
-export interface EdgeXLatestFundingRateResponse {
-    data: EdgeXFundingRateItem[];
 }

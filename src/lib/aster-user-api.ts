@@ -8,7 +8,8 @@ import type {
   AsterPositionV2,
   AsterUserTrade,
   AsterCommissionRate,
-  AsterListenKey
+  AsterListenKey,
+  AsterIncomeHistoryItem
 } from '@/types';
 import { hmacSHA256 } from './utils';
 
@@ -22,14 +23,14 @@ async function makeAsterAuthenticatedRequest<T>(
   apiKey: string,
   secretKey: string,
   params?: Record<string, any>
-): Promise<T> { // Changed to throw error instead of returning null
+): Promise<T> {
   if (!apiKey || !secretKey) {
     console.error('API key or secret key is missing for authenticated request.');
     throw new Error('API key or secret key is missing.');
   }
 
   const timestamp = Date.now();
-  let queryParams = { ...params, timestamp, recvWindow: 5000 }; // Added recvWindow
+  let queryParams = { ...params, timestamp, recvWindow: 5000 }; 
   
   const queryString = Object.entries(queryParams)
     .map(([key, value]) => `${key}=${encodeURIComponent(String(value))}`)
@@ -40,8 +41,6 @@ async function makeAsterAuthenticatedRequest<T>(
 
   const headers = new Headers();
   headers.append('X-MBX-APIKEY', apiKey);
-  // For GET/DELETE, Content-Type is not typically needed if body is not sent.
-  // For POST/PUT, it should be set if body is form-urlencoded
   if (method === 'POST' || method === 'PUT') {
     headers.append('Content-Type', 'application/x-www-form-urlencoded');
   }
@@ -51,14 +50,12 @@ async function makeAsterAuthenticatedRequest<T>(
     const response = await fetch(url, {
       method: method,
       headers: headers,
-      // Body is not added here as params are in query string for this setup
     });
 
-    const responseBodyText = await response.text(); // Read body once
+    const responseBodyText = await response.text(); 
 
     if (!response.ok) {
-      console.error(`Aster User API error (${endpoint}): ${response.status} ${responseBodyText}`);
-      // Attempt to parse as JSON for structured error, otherwise use text
+      console.error(`Aster User API error (${endpoint} - ${method}): ${response.status} ${responseBodyText}`);
       try {
         const errorJson = JSON.parse(responseBodyText);
         throw new Error(errorJson.msg || `API Error ${response.status}: ${responseBodyText}`);
@@ -66,11 +63,13 @@ async function makeAsterAuthenticatedRequest<T>(
         throw new Error(`API Error ${response.status}: ${responseBodyText}`);
       }
     }
-    // If response is OK, try to parse as JSON
     try {
+        if (responseBodyText.trim() === '' && response.status === 200 && (method === 'PUT' || method === 'DELETE')) {
+            // For PUT/DELETE that might return empty success response
+            return {} as T;
+        }
         return JSON.parse(responseBodyText) as T;
     } catch (e) {
-        // Handle cases where successful response might not be JSON (e.g. {} for keepAlive)
         if (responseBodyText.trim() === '{}' && (method === 'PUT' || method === 'DELETE')) {
             return {} as T; 
         }
@@ -78,8 +77,8 @@ async function makeAsterAuthenticatedRequest<T>(
         throw new Error(`Failed to parse API response: ${responseBodyText}`);
     }
   } catch (error: any) {
-    console.error(`Failed to fetch Aster User API (${endpoint}):`, error.message);
-    throw error; // Re-throw the caught error or a new one
+    console.error(`Failed to fetch Aster User API (${endpoint} - ${method}):`, error.message);
+    throw error; 
   }
 }
 
@@ -120,6 +119,25 @@ export async function fetchAsterCommissionRate(apiKey: string, secretKey: string
    return makeAsterAuthenticatedRequest<AsterCommissionRate>(`${ASTER_API_BASE_URL}/commissionRate`, 'GET', apiKey, secretKey, { symbol });
 }
 
+export async function fetchAsterIncomeHistory(
+    apiKey: string,
+    secretKey: string,
+    incomeType?: "TRANSFER" | "WELCOME_BONUS" | "REALIZED_PNL" | "FUNDING_FEE" | "COMMISSION" | "INSURANCE_CLEAR" | "MARKET_MERCHANT_RETURN_REWARD" | string,
+    symbol?: string,
+    startTime?: number,
+    endTime?: number,
+    limit: number = 1000 // Default to fetching up to 1000 income records
+): Promise<AsterIncomeHistoryItem[]> {
+    const params: Record<string, any> = { limit };
+    if (incomeType) params.incomeType = incomeType;
+    if (symbol) params.symbol = symbol;
+    if (startTime) params.startTime = startTime;
+    if (endTime) params.endTime = endTime;
+
+    return makeAsterAuthenticatedRequest<AsterIncomeHistoryItem[]>(`${ASTER_API_BASE_URL}/income`, 'GET', apiKey, secretKey, params);
+}
+
+
 // --- Listen Key for WebSocket ---
 export async function createAsterListenKey(apiKey: string): Promise<AsterListenKey> {
   if (!apiKey) {
@@ -145,22 +163,23 @@ export async function createAsterListenKey(apiKey: string): Promise<AsterListenK
 
 export async function keepAliveAsterListenKey(apiKey: string, listenKey: string): Promise<Record<string, unknown>> {
   if (!apiKey || !listenKey) {
-    console.error('API key or listenKey is missing for keepAlive.');
-    throw new Error('API key or listenKey is missing for keepAlive.');
+    // ListenKey is not actually sent for keepAlive, but it's good to check it exists in component state
+    console.error('API key or listenKey state is missing for keepAlive.');
+    throw new Error('API key or listenKey state is missing for keepAlive.');
   }
    try {
-    // Aster's keepalive is a PUT to /listenKey with NO body parameters, just the API key in header.
-    // The listenKey itself is part of the URL for the WebSocket, not typically sent in PUT body for keepalive.
-    // Re-checking docs: `PUT /fapi/v1/listenKey` with `X-MBX-APIKEY` and NO parameters.
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'PUT',
       headers: { 'X-MBX-APIKEY': apiKey },
-      // body: new URLSearchParams({ listenKey }) // This is likely incorrect for Aster PUT listenKey
     });
     const responseBodyText = await response.text();
     if (!response.ok) {
       console.error(`Aster ListenKey keepAlive error: ${response.status} ${responseBodyText}`);
       throw new Error(`ListenKey keepAlive failed: ${responseBodyText}`);
+    }
+     // Expecting {} for success
+    if (responseBodyText.trim() === '{}') {
+        return {};
     }
     return JSON.parse(responseBodyText); 
   } catch (error: any) {
@@ -171,21 +190,22 @@ export async function keepAliveAsterListenKey(apiKey: string, listenKey: string)
 
 export async function deleteAsterListenKey(apiKey: string, listenKey: string): Promise<Record<string, unknown>> {
    if (!apiKey || !listenKey) {
-    console.error('API key or listenKey is missing for delete.');
-    throw new Error('API key or listenKey is missing for delete.');
+    console.error('API key or listenKey state is missing for delete.');
+    throw new Error('API key or listenKey state is missing for delete.');
   }
   try {
-    // Aster's delete is a DELETE to /listenKey with NO body parameters, just the API key in header.
-    // Re-checking docs: `DELETE /fapi/v1/listenKey` with `X-MBX-APIKEY` and NO parameters.
     const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
       method: 'DELETE',
       headers: { 'X-MBX-APIKEY': apiKey },
-      // body: new URLSearchParams({ listenKey }) // This is likely incorrect for Aster DELETE listenKey
     });
     const responseBodyText = await response.text();
      if (!response.ok) {
       console.error(`Aster ListenKey delete error: ${response.status} ${responseBodyText}`);
       throw new Error(`ListenKey delete failed: ${responseBodyText}`);
+    }
+    // Expecting {} for success
+    if (responseBodyText.trim() === '{}') {
+        return {};
     }
     return JSON.parse(responseBodyText); 
   } catch (error:any) {
@@ -193,5 +213,3 @@ export async function deleteAsterListenKey(apiKey: string, listenKey: string): P
     throw error;
   }
 }
-
-    
