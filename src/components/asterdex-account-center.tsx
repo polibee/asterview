@@ -44,10 +44,15 @@ import {
   deleteAsterListenKey,
 } from '@/lib/aster-user-api';
 import {
-  DollarSign, TrendingDown, TrendingUp, ListChecks, BarChart3, Landmark, Percent, Zap, ArrowUpRightSquare, Trophy, Info, Settings, AlertTriangle, WifiOff, Wifi, ReceiptText, RefreshCw
+  DollarSign, TrendingDown, TrendingUp, ListChecks, BarChart3, Landmark, Percent, Zap, ArrowUpRightSquare, Trophy, Info, Settings, AlertTriangle, WifiOff, Wifi, ReceiptText, RefreshCw, Gift
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfDay, endOfDay, fromUnixTime, getUnixTime, getYear, getMonth, getDate, startOfTomorrow, subDays, addDays } from 'date-fns';
+
+// Configuration for the Invite Code Feature
+const ENABLE_INVITE_CODE_FEATURE = true;
+const INVITE_CODE = "Ea990e";
+const INVITE_URL = `https://www.asterdex.com/en/referral/${INVITE_CODE}`;
 
 const parseFloatSafe = (value: string | number | undefined | null, defaultValue: number | null = null): number | null => {
   if (value === undefined || value === null || String(value).trim() === '') return defaultValue;
@@ -107,16 +112,16 @@ const MetricCard: React.FC<MetricCardProps> = ({ title, value, description, icon
   );
 };
 
-const ACCOUNT_SUMMARY_LS_KEY = 'asterAccountSummaryData_v16';
-const TRADES_LS_KEY_PREFIX = 'asterUserTrades_v14_';
-const INCOME_HISTORY_LS_KEY_PREFIX = 'asterIncomeHistory_v8_';
+const ACCOUNT_SUMMARY_LS_KEY = 'asterAccountSummaryData_v17'; // Incremented version for cache invalidation if structure changes
+const TRADES_LS_KEY_PREFIX = 'asterUserTrades_v15_'; // Incremented version
+const INCOME_HISTORY_LS_KEY_PREFIX = 'asterIncomeHistory_v9_'; // Incremented
 
 const DATA_STALE_MS = 5 * 60 * 1000; // 5 minutes
 const INITIAL_TRADE_FETCH_LIMIT = 1000;
 const UPDATE_TRADE_FETCH_LIMIT = 1000;
 const INCOME_FETCH_LIMIT = 1000;
 const INCOME_HISTORY_DAYS_LOOKBACK = 7;
-const API_CALL_DELAY_MS = 350; // Increased for caution
+const API_CALL_DELAY_MS = 350; 
 const DEFAULT_COMMISSION_SYMBOL = 'BTCUSDT';
 
 
@@ -140,21 +145,15 @@ export function AsterdexAccountCenter() {
 
   const resetAccountDataToDefaults = useCallback((status: AsterAccountSummaryData['webSocketStatus'] = 'Disconnected'): AsterAccountSummaryData => {
     return {
-      portfolioValue: null, // Will be populated by API
-      totalUnrealizedPNL: null, // Will be populated by API
-      totalRealizedPNL: 0,
-      totalCommissions: 0,
-      totalFundingFees: 0,
+      portfolioValue: null, totalUnrealizedPNL: null,
+      totalRealizedPNL: 0, totalCommissions: 0, totalFundingFees: 0,
       totalTrades: 0, longTrades: 0, shortTrades: 0,
       totalVolume: 0, longVolume: 0, shortVolume: 0,
       totalFeesPaid: 0, latestFee: null,
       commissionRateMaker: null, commissionRateTaker: null, commissionSymbol: null,
-      previousDayVolumeAuBoost: 0,
-      auTraderBoost: "1x (Base)",
-      rhPointsTotal: 0,
-      todayTotalVolume: 0,
-      webSocketStatus: status,
-      lastUpdated: 0,
+      previousDayVolumeAuBoost: 0, auTraderBoost: "1x (Base)",
+      rhPointsTotal: 0, todayTotalVolume: 0,
+      webSocketStatus: status, lastUpdated: 0,
       balances: [], accountInfo: undefined, positions: [], incomeHistory: [], userTrades: [],
     };
   }, []);
@@ -215,7 +214,7 @@ export function AsterdexAccountCenter() {
       const storedData = localStorage.getItem(ACCOUNT_SUMMARY_LS_KEY);
       if (!storedData) return null;
       const parsedData = JSON.parse(storedData) as Partial<AsterAccountSummaryData>;
-      return { // Ensure defaults for numerical values if missing from cache
+      return { 
         ...parsedData,
         portfolioValue: parsedData.portfolioValue ?? null,
         totalUnrealizedPNL: parsedData.totalUnrealizedPNL ?? null,
@@ -246,14 +245,12 @@ export function AsterdexAccountCenter() {
     if (typeof window === 'undefined') return;
     if (!data) { localStorage.removeItem(ACCOUNT_SUMMARY_LS_KEY); return; }
     try {
-      // Destructure to exclude large arrays from the summary to keep it small
       const { incomeHistory, balances, positions, accountInfo, userTrades, ...summaryToStore } = data;
       localStorage.setItem(ACCOUNT_SUMMARY_LS_KEY, JSON.stringify(summaryToStore));
     } catch (e) { console.error("Error saving account summary to localStorage:", e); }
   }, []);
 
-
-  const fetchAndCacheTradesForSymbol = async (
+const fetchAndCacheTradesForSymbol = async (
     currentApiKey: string, currentSecretKey: string, symbol: string,
     cachedSymbolData: CachedSymbolTrades | undefined
   ): Promise<CachedSymbolTrades> => {
@@ -272,7 +269,7 @@ export function AsterdexAccountCenter() {
         combinedTrades.forEach(trade => uniqueTradesMap.set(trade.id, trade));
         allTradesForSymbol = Array.from(uniqueTradesMap.values()).sort((a, b) => a.id - b.id);
       }
-      if (fetchedTrades.length < tradesToFetchLimit && !newestCachedTradeId && !fetchFromId) { // Only if it was an initial full limit fetch
+      if (fetchedTrades.length < tradesToFetchLimit && !newestCachedTradeId && !fetchFromId) { 
         allHistoryPotentiallyFetched = true;
       }
     } catch (e) {
@@ -295,9 +292,7 @@ export function AsterdexAccountCenter() {
     userTrades: AsterUserTrade[] | undefined,
     incomeHistoryData: AsterIncomeHistoryItem[] | undefined
   ) => {
-    let totalRealizedPNLFromIncome = 0;
-    let totalCommissionsFromIncome = 0;
-    let totalFundingFeesFromIncome = 0;
+    let totalRealizedPNLFromIncome = 0; let totalCommissionsFromIncome = 0; let totalFundingFeesFromIncome = 0;
 
     if (incomeHistoryData) {
       incomeHistoryData.forEach(item => {
@@ -310,15 +305,12 @@ export function AsterdexAccountCenter() {
 
     if (!userTrades || userTrades.length === 0) {
       return {
-        totalRealizedPNL: totalRealizedPNLFromIncome,
-        totalCommissions: totalCommissionsFromIncome,
-        totalFundingFees: totalFundingFeesFromIncome,
+        totalRealizedPNL: totalRealizedPNLFromIncome, totalCommissions: totalCommissionsFromIncome, totalFundingFees: totalFundingFeesFromIncome,
         totalTrades: 0, longTrades: 0, shortTrades: 0,
         totalVolume: 0, longVolume: 0, shortVolume: 0,
         totalFeesPaid: 0, latestFee: null,
         previousDayVolumeAuBoost: 0, auTraderBoost: "1x (Base)",
-        rhPointsTotal: 0,
-        todayTotalVolume: 0,
+        rhPointsTotal: 0, todayTotalVolume: 0,
       };
     }
 
@@ -354,12 +346,10 @@ export function AsterdexAccountCenter() {
       if (trade.side.toUpperCase() === 'BUY') { longTrades++; longVolume += quoteQty; }
       else if (trade.side.toUpperCase() === 'SELL') { shortTrades++; shortVolume += quoteQty; }
 
-      // For Previous Day's Volume (Au Boost)
       if (tradeTime >= previousDayStartUTCTimestamp && tradeTime < currentDayStartUTCTimestamp) {
         if (trade.maker === false) previousDayTakerVolume += quoteQty;
         else previousDayMakerVolume += quoteQty;
       }
-      // For Today's Total Volume
       if (tradeTime >= currentDayStartUTCTimestamp && tradeTime < nextDayUTCTimestampStart) {
         currentDayTotalVolume += quoteQty;
       }
@@ -370,22 +360,20 @@ export function AsterdexAccountCenter() {
 
     const previousDayVolumeAuBoostCalc = previousDayTakerVolume + (previousDayMakerVolume * 0.5);
 
-    let auTraderBoostFactor = "1x (Base)"; // Means +0x additional boost
+    let auTraderBoostFactor = "1x (Base)"; // This means +0x additional boost.
     if (previousDayVolumeAuBoostCalc >= 500000) auTraderBoostFactor = "+3x";
     else if (previousDayVolumeAuBoostCalc >= 200000) auTraderBoostFactor = "+2.5x";
     else if (previousDayVolumeAuBoostCalc >= 50000) auTraderBoostFactor = "+2x";
     else if (previousDayVolumeAuBoostCalc >= 10000) auTraderBoostFactor = "+1x";
-
-
+    
     const rhPointsTotalCalc = allTradesTakerVolume + (allTradesMakerVolume * 0.5);
+    const tradeMetricsScopeMessage = `Based on fetched & cached trades (up to ${INITIAL_TRADE_FETCH_LIMIT} recent per symbol initially, plus newer trades for symbols with previous activity or current positions). May not reflect complete lifetime history for all symbols.`;
 
     return {
-      totalRealizedPNL: totalRealizedPNLFromIncome,
-      totalCommissions: totalCommissionsFromIncome,
-      totalFundingFees: totalFundingFeesFromIncome,
+      totalRealizedPNL: totalRealizedPNLFromIncome, totalCommissions: totalCommissionsFromIncome, totalFundingFees: totalFundingFeesFromIncome,
       totalTrades: userTrades.length, longTrades, shortTrades,
       totalVolume, longVolume, shortVolume,
-      totalFeesPaid: totalFeesPaidFromTrades, // This is commission from trades
+      totalFeesPaid: totalFeesPaidFromTrades, 
       latestFee: latestFeeValue,
       previousDayVolumeAuBoost: previousDayVolumeAuBoostCalc, auTraderBoost: auTraderBoostFactor,
       rhPointsTotal: rhPointsTotalCalc,
@@ -395,19 +383,25 @@ export function AsterdexAccountCenter() {
 
   const loadAccountData = useCallback(async (forceRefresh = false) => {
     if (!isApiKeysSet || !apiKey || !secretKey) {
-      setError("API Key and Secret Key are required.");
       setAccountData(resetAccountDataToDefaults('Disconnected'));
+      setError("API Key and Secret Key are required.");
       return;
+    }
+    
+    let initialRenderData = accountData;
+    if (accountData === null && !forceRefresh) { // Very first load attempt with keys
+        initialRenderData = resetAccountDataToDefaults(webSocketStatus);
+        setAccountData(initialRenderData);
     }
 
     setIsLoading(true); setError(null);
-    let initialRenderData: AsterAccountSummaryData = resetAccountDataToDefaults(webSocketStatus); // Use current WS status
 
     try {
       const cachedSummary = loadAccountSummaryFromLocalStorage();
       if (cachedSummary && !forceRefresh && (Date.now() - (cachedSummary.lastUpdated || 0) < DATA_STALE_MS)) {
-        initialRenderData = { ...initialRenderData, ...cachedSummary, webSocketStatus: webSocketStatus }; // Preserve current WS status
-        setAccountData(initialRenderData);
+         if (!initialRenderData || initialRenderData.portfolioValue === null ) { // Only use cached summary if current data is minimal
+            setAccountData(prev => ({...(prev || resetAccountDataToDefaults(webSocketStatus)), ...cachedSummary, webSocketStatus: webSocketStatus}));
+         }
       }
 
       const [balancesResp, accInfo, commissionInfoResp] = await Promise.all([
@@ -417,8 +411,8 @@ export function AsterdexAccountCenter() {
       ]);
       await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
 
-      let newAccountData = {
-        ...initialRenderData,
+      let newAccountDataPartial = {
+        ...(initialRenderData || resetAccountDataToDefaults(webSocketStatus)),
         portfolioValue: parseFloatSafe(accInfo.totalMarginBalance),
         totalUnrealizedPNL: parseFloatSafe(accInfo.totalUnrealizedProfit),
         commissionRateMaker: commissionInfoResp?.makerCommissionRate ?? null,
@@ -427,8 +421,9 @@ export function AsterdexAccountCenter() {
         balances: balancesResp || [],
         accountInfo: accInfo,
         positions: accInfo.positions || [],
-        webSocketStatus: webSocketStatus, // Keep current WS status
+        webSocketStatus: webSocketStatus, 
       };
+      setAccountData(prev => ({...prev, ...newAccountDataPartial})); // Update UI with base info first
 
       let cachedIncome = loadIncomeHistoryFromLocalStorage();
       let fetchedIncomeHistory: AsterIncomeHistoryItem[];
@@ -439,40 +434,40 @@ export function AsterdexAccountCenter() {
           fetchedIncomeHistory = await fetchAsterIncomeHistory(apiKey, secretKey, undefined, undefined, sevenDaysAgo, undefined, INCOME_FETCH_LIMIT);
           saveIncomeHistoryToLocalStorage(fetchedIncomeHistory);
       }
-      newAccountData.incomeHistory = fetchedIncomeHistory;
-      await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
-
-
+      
       let currentTradesBySymbolCache = loadTradesFromLocalStorage() || {};
-      const symbolsInPositions = (accInfo?.positions || []).map(p => p.symbol);
-      const symbolsInCache = Object.keys(currentTradesBySymbolCache);
-      const symbolsToUpdate = Array.from(new Set([...symbolsInPositions, ...symbolsInCache]));
+      const symbolsInPositionsAndCache = Array.from(new Set([
+          ...(accInfo?.positions || []).map(p => p.symbol), 
+          ...Object.keys(currentTradesBySymbolCache)
+      ]));
 
-      let allUserTradesFromCache: AsterUserTrade[] = [];
+      let allUserTradesArray: AsterUserTrade[] = [];
 
-      for (const symbol of symbolsToUpdate) {
+      for (const symbol of symbolsInPositionsAndCache) {
         if (!symbol) continue;
-        currentTradesBySymbolCache[symbol] = await fetchAndCacheTradesForSymbol(apiKey, secretKey, symbol, currentTradesBySymbolCache[symbol]);
-        if(currentTradesBySymbolCache[symbol]?.trades) {
-          allUserTradesFromCache.push(...currentTradesBySymbolCache[symbol].trades);
+        const updatedSymbolCache = await fetchAndCacheTradesForSymbol(apiKey, secretKey, symbol, currentTradesBySymbolCache[symbol]);
+        currentTradesBySymbolCache[symbol] = updatedSymbolCache;
+        if(updatedSymbolCache?.trades) {
+          allUserTradesArray.push(...updatedSymbolCache.trades);
         }
         await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY_MS));
       }
       saveTradesToLocalStorage(currentTradesBySymbolCache);
-      const uniqueUserTrades = Array.from(new Map(allUserTradesFromCache.map(trade => [trade.id, trade])).values()).sort((a, b) => a.id - b.id);
-
+      
+      const uniqueUserTrades = Array.from(new Map(allUserTradesArray.map(trade => [trade.id, trade])).values()).sort((a, b) => a.id - b.id);
 
       const tradeMetrics = calculateTradeMetrics(uniqueUserTrades, fetchedIncomeHistory);
 
-      newAccountData = {
-        ...newAccountData,
+      const finalAccountData = {
+        ...newAccountDataPartial, // Start with the already set partial data
+        incomeHistory: fetchedIncomeHistory,
+        userTrades: uniqueUserTrades, 
         ...tradeMetrics,
-        userTrades: uniqueUserTrades, // Store the processed trades
         lastUpdated: Date.now(),
       };
 
-      setAccountData(newAccountData);
-      saveAccountSummaryToLocalStorage(newAccountData); // Save the summary without large arrays
+      setAccountData(finalAccountData);
+      saveAccountSummaryToLocalStorage(finalAccountData);
 
     } catch (err: any) {
       console.error("Error fetching account data via REST:", err);
@@ -481,7 +476,7 @@ export function AsterdexAccountCenter() {
     } finally {
       setIsLoading(false);
     }
-  }, [apiKey, secretKey, webSocketStatus, isApiKeysSet, resetAccountDataToDefaults, loadAccountSummaryFromLocalStorage, saveAccountSummaryToLocalStorage, getTradesLocalStorageKey, loadTradesFromLocalStorage, saveTradesToLocalStorage, getIncomeHistoryLocalStorageKey, loadIncomeHistoryFromLocalStorage, saveIncomeHistoryToLocalStorage]);
+  }, [apiKey, secretKey, webSocketStatus, isApiKeysSet, resetAccountDataToDefaults, loadAccountSummaryFromLocalStorage, saveAccountSummaryToLocalStorage, getTradesLocalStorageKey, loadTradesFromLocalStorage, saveTradesToLocalStorage, getIncomeHistoryLocalStorageKey, loadIncomeHistoryFromLocalStorage, saveIncomeHistoryToLocalStorage, accountData]);
 
 
   useEffect(() => {
@@ -503,7 +498,7 @@ export function AsterdexAccountCenter() {
       loadAccountData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApiKeysSet, apiKey, secretKey]);
+  }, [isApiKeysSet, apiKey, secretKey]); // loadAccountData itself has other deps like accountData, consider if this is correct
 
   useEffect(() => {
     if (!isApiKeysSet || !apiKey || !secretKey || typeof window === 'undefined') {
@@ -539,11 +534,11 @@ export function AsterdexAccountCenter() {
             if (localListenKeyAttempt && apiKey) {
               try { await keepAliveAsterListenKey(apiKey, localListenKeyAttempt); }
               catch (e: any) {
-                console.warn("Failed to keep alive listenKey:", e.message); // Changed to warn
-                if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current?.close(); // Attempt to close if keep-alive fails
+                console.warn("Failed to keep alive listenKey:", e.message); 
+                if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current?.close(); 
               }
             }
-          }, 30 * 60 * 1000); // 30 minutes
+          }, 30 * 60 * 1000); 
         };
 
         currentWs.onmessage = (event) => {
@@ -577,46 +572,54 @@ export function AsterdexAccountCenter() {
 
                   if (newAccountInfo) {
                     const accAssetIndex = newAccountInfo.assets.findIndex(a => a.asset === assetIdentifier);
-                    const existingAccAsset = accAssetIndex !== -1 ? newAccountInfo.assets[accAssetIndex] : undefined;
+                    let existingAccAsset = accAssetIndex !== -1 ? newAccountInfo.assets[accAssetIndex] : undefined;
+                    if (!existingAccAsset) { // Create a default structure if asset not found
+                        existingAccAsset = { asset: assetIdentifier, walletBalance: "0", unrealizedProfit: "0", marginBalance: "0", maintMargin: "0", initialMargin: "0", positionInitialMargin: "0", openOrderInitialMargin: "0", crossWalletBalance: "0", crossUnPnl: "0", availableBalance: "0", maxWithdrawAmount: "0", marginAvailable: false, updateTime: 0 };
+                        newAccountInfo.assets.push(existingAccAsset);
+                        accAssetIndex = newAccountInfo.assets.length -1;
+                    }
+                    
                     const updatedAccAssetData: AsterAccountInfoV2Asset = {
-                        ...(existingAccAsset || { asset: assetIdentifier, walletBalance: "0", unrealizedProfit: "0", marginBalance: "0", maintMargin: "0", initialMargin: "0", positionInitialMargin: "0", openOrderInitialMargin: "0", crossWalletBalance: "0", crossUnPnl: "0", availableBalance: "0", maxWithdrawAmount: "0", marginAvailable: false, updateTime: 0 }),
+                        ...existingAccAsset,
                         walletBalance: bUpdate.wb, crossWalletBalance: bUpdate.cw, updateTime: typedMessage.E,
                         availableBalance: bUpdate.wb, 
                         marginBalance: ( (parseFloatSafe(bUpdate.wb) ?? 0) + (parseFloatSafe(existingAccAsset?.unrealizedProfit ?? "0") ?? 0) ).toString(),
                     };
-                    if (accAssetIndex !== -1) newAccountInfo.assets[accAssetIndex] = updatedAccAssetData; else newAccountInfo.assets.push(updatedAccAssetData);
+                     newAccountInfo.assets[accAssetIndex] = updatedAccAssetData;
                   }
                 });
 
                 update.a.P.forEach(pUpdate => {
-                  const symbolIdentifier = pUpdate.s;
-                  const positionSideIdentifier = pUpdate.ps;
-                  let posIndex = newPositions.findIndex(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
-                  
-                  const existingPositionFromState = posIndex !== -1 ? newPositions[posIndex] : null;
-                  const existingPositionFromAccountInfo = newAccountInfo?.positions.find(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
-                  const baseExistingPos = existingPositionFromState || existingPositionFromAccountInfo;
+                    const symbolIdentifier = pUpdate.s;
+                    const positionSideIdentifier = pUpdate.ps;
+                    let posIndex = newPositions.findIndex(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
+                
+                    let existingPositionForDefaults = posIndex !== -1 ? newPositions[posIndex] : newAccountInfo?.positions.find(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
+                    if (!existingPositionForDefaults) {
+                        existingPositionForDefaults = { symbol: symbolIdentifier, positionSide: positionSideIdentifier, positionAmt: "0", entryPrice: "0", unrealizedProfit: "0", marginType: "cross", isolatedMargin: "0", updateTime: 0, initialMargin: "0", maintMargin: "0", positionInitialMargin: "0", openOrderInitialMargin: "0", leverage: "0", isolated: false, maxNotional: "0", isAutoAddMargin: "false", liquidationPrice: "0", markPrice: "0", maxNotionalValue: "0" };
+                    }
 
-                  const updatedPositionData: AsterPositionV2 = {
-                      symbol: symbolIdentifier, positionSide: positionSideIdentifier,
-                      positionAmt: pUpdate.pa, entryPrice: pUpdate.ep, unrealizedProfit: pUpdate.up,
-                      marginType: pUpdate.mt as "isolated" | "cross", isolatedMargin: pUpdate.iw,
-                      updateTime: typedMessage.E,
-                      initialMargin: baseExistingPos?.initialMargin || "0", maintMargin: baseExistingPos?.maintMargin || "0",
-                      positionInitialMargin: baseExistingPos?.positionInitialMargin || "0", openOrderInitialMargin: baseExistingPos?.openOrderInitialMargin || "0",
-                      leverage: baseExistingPos?.leverage || "0", isolated: pUpdate.mt === 'isolated',
-                      maxNotional: baseExistingPos?.maxNotional || "0",
-                      isAutoAddMargin: baseExistingPos?.isAutoAddMargin || "false",
-                      liquidationPrice: baseExistingPos?.liquidationPrice || "0", markPrice: baseExistingPos?.markPrice || "0",
-                      maxNotionalValue: baseExistingPos?.maxNotionalValue || "0",
-                  };
-                  if (posIndex !== -1) newPositions[posIndex] = updatedPositionData; else newPositions.push(updatedPositionData);
+                    const updatedPositionData: AsterPositionV2 = {
+                        symbol: symbolIdentifier, positionSide: positionSideIdentifier,
+                        positionAmt: pUpdate.pa, entryPrice: pUpdate.ep, unrealizedProfit: pUpdate.up,
+                        marginType: pUpdate.mt, isolatedMargin: pUpdate.iw,
+                        updateTime: typedMessage.E,
+                        initialMargin: existingPositionForDefaults.initialMargin, maintMargin: existingPositionForDefaults.maintMargin,
+                        positionInitialMargin: existingPositionForDefaults.positionInitialMargin, openOrderInitialMargin: existingPositionForDefaults.openOrderInitialMargin,
+                        leverage: existingPositionForDefaults.leverage, isolated: pUpdate.mt === 'isolated',
+                        maxNotional: existingPositionForDefaults.maxNotional,
+                        isAutoAddMargin: existingPositionForDefaults.isAutoAddMargin,
+                        liquidationPrice: existingPositionForDefaults.liquidationPrice, markPrice: existingPositionForDefaults.markPrice,
+                        maxNotionalValue: existingPositionForDefaults.maxNotionalValue,
+                    };
 
-                  if (newAccountInfo) {
-                      let accPosIndex = newAccountInfo.positions.findIndex(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
-                      if (accPosIndex !== -1) newAccountInfo.positions[accPosIndex] = updatedPositionData;
-                      else newAccountInfo.positions.push(updatedPositionData);
-                  }
+                    if (posIndex !== -1) newPositions[posIndex] = updatedPositionData; else newPositions.push(updatedPositionData);
+
+                    if (newAccountInfo) {
+                        let accPosIndex = newAccountInfo.positions.findIndex(p => p.symbol === symbolIdentifier && p.positionSide === positionSideIdentifier);
+                        if (accPosIndex !== -1) newAccountInfo.positions[accPosIndex] = updatedPositionData;
+                        else newAccountInfo.positions.push(updatedPositionData);
+                    }
                 });
                 
                 let newPortfolioValue = prevData.portfolioValue;
@@ -639,35 +642,32 @@ export function AsterdexAccountCenter() {
                 saveAccountSummaryToLocalStorage(updatedData);
                 saveIncomeHistoryToLocalStorage(prevData.incomeHistory || null);
                 const tradesKey = getTradesLocalStorageKey();
-                if(tradesKey) saveTradesToLocalStorage(loadTradesFromLocalStorage()); // Save existing trades
+                if(tradesKey) saveTradesToLocalStorage(loadTradesFromLocalStorage());
                 return updatedData;
               });
             } else if (typedMessage.e === 'ORDER_TRADE_UPDATE') {
-              // Trigger a full REST refresh to update trade-dependent metrics
-              // A more granular update would involve fetching only new trades.
-              loadAccountData(true);
+              loadAccountData(true); // Force refresh for trade-dependent metrics
             } else if (typedMessage.e === 'listenKeyExpired') {
               console.warn("ListenKey expired via WebSocket. Attempting to reconnect.");
               if (wsRef.current) {
-                  wsRef.current.onclose = null; // Prevent double reconnect logic
+                  wsRef.current.onclose = null; 
                   wsRef.current.close(1000, "ListenKey expired");
                   wsRef.current = null;
               }
-              setListenKey(null);
-              localListenKeyAttempt = null; // Reset local attempt
-              setAccountData(prev => prev ? {...prev, webSocketStatus: 'Connecting'} : resetAccountDataToDefaults('Connecting')); // Reset to defaults before reconnect
+              setListenKey(null); localListenKeyAttempt = null; 
+              setAccountData(resetAccountDataToDefaults('Connecting'));
               if (isApiKeysSet && apiKey && secretKey && !reconnectTimeoutRef.current) {
                   reconnectTimeoutRef.current = setTimeout(() => {
-                      reconnectTimeoutRef.current = null; // Clear timeout ref before next attempt
+                      reconnectTimeoutRef.current = null; 
                       connectWebSocket();
-                  }, 1000 + Math.random() * 1000); // Small randomized delay
+                  }, 1000 + Math.random() * 1000); 
               }
             }
           } catch (e) { console.error("Error processing WebSocket message:", e); }
         };
 
         currentWs.onerror = (errorEvent) => {
-          console.warn("AsterDex WebSocket onerror event. Details may follow in onclose.", errorEvent); // Changed to warn
+          console.warn("AsterDex WebSocket onerror event. Details may follow in onclose.", errorEvent);
           setWebSocketStatus('Error');
            if (isApiKeysSet && apiKey && secretKey && !reconnectTimeoutRef.current) {
              if (wsRef.current) {
@@ -688,22 +688,22 @@ export function AsterdexAccountCenter() {
           if (keepAliveIntervalRef.current) { clearInterval(keepAliveIntervalRef.current); keepAliveIntervalRef.current = null; }
           const wasManuallyClosed = event.code === 1000 && (event.reason === "Component unmounting or API keys changed" || event.reason === "User disconnected" || event.reason === "API Keys not set or component unmounting" || event.reason === "ListenKey expired" || event.reason === "WebSocket error occurred");
 
-          wsRef.current = null; // Clear wsRef on close
+          wsRef.current = null; 
           if (!wasManuallyClosed && isApiKeysSet && apiKey && secretKey && !reconnectTimeoutRef.current) {
             console.warn(`WebSocket closed unexpectedly. Code: ${event.code}, Reason: "${event.reason}". Attempting to reconnect...`);
-            setListenKey(null); localListenKeyAttempt = null; // Force new listen key
+            setListenKey(null); localListenKeyAttempt = null; 
             setAccountData(prev => prev ? {...prev, webSocketStatus: 'Connecting'} : resetAccountDataToDefaults('Connecting'));
              reconnectTimeoutRef.current = setTimeout(() => {
                 reconnectTimeoutRef.current = null;
                 connectWebSocket();
-             }, 5000 + Math.random() * 5000); // Increased reconnect delay
+             }, 5000 + Math.random() * 5000); 
           } else if (wasManuallyClosed && event.reason !== "ListenKey expired" && event.reason !== "WebSocket error occurred") {
             setWebSocketStatus('Disconnected');
-            setListenKey(null); localListenKeyAttempt = null;
+            if (event.reason !== "User disconnected") { // Only nullify listenKey if not user initiated disconnect
+                setListenKey(null); localListenKeyAttempt = null;
+            }
             console.log(`WebSocket closed. Code: ${event.code}, Reason: "${event.reason}". Not attempting reconnect due to manual/controlled closure.`);
           } else {
-            // If it was an error or expired key, reconnect logic might already be triggered or should be by the specific handlers
-            // Setting to 'Disconnected' if no other status change happened
              if (webSocketStatus !== 'Connecting' && webSocketStatus !== 'Error') {
                  setWebSocketStatus('Disconnected');
              }
@@ -721,7 +721,7 @@ export function AsterdexAccountCenter() {
             reconnectTimeoutRef.current = setTimeout(() => {
                 reconnectTimeoutRef.current = null;
                 connectWebSocket();
-            }, 7000 + Math.random() * 5000); // Longer delay for connection errors
+            }, 7000 + Math.random() * 5000); 
         }
       }
     };
@@ -742,7 +742,7 @@ export function AsterdexAccountCenter() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApiKeysSet, apiKey, secretKey, listenKey, resetAccountDataToDefaults, loadAccountData, getTradesLocalStorageKey, saveTradesToLocalStorage, loadTradesFromLocalStorage, saveIncomeHistoryToLocalStorage, getIncomeHistoryLocalStorageKey, loadIncomeHistoryFromLocalStorage ]);
+  }, [isApiKeysSet, apiKey, secretKey]);
 
 
   const handleSaveApiKeys = () => {
@@ -768,10 +768,9 @@ export function AsterdexAccountCenter() {
     setApiKey(tempApiKey); setSecretKey(tempSecretKey);
     if (typeof window !== 'undefined') { localStorage.setItem('asterApiKey', tempApiKey); localStorage.setItem('asterSecretKey', tempSecretKey); }
     setIsApiKeysSet(true); setIsSettingsDialogOpen(false);
-    setAccountData(null); // Clear old data before fetching new
+    setAccountData(null); 
     setError(null);
     toast({ title: "Success", description: "API Keys saved. Fetching data..." });
-    // loadAccountData will be triggered by the useEffect for isApiKeysSet/apiKey change
   };
 
   const handleDisconnect = () => {
@@ -792,11 +791,11 @@ export function AsterdexAccountCenter() {
     setApiKey(''); setSecretKey(''); setTempApiKey(''); setTempSecretKey('');
     if (typeof window !== 'undefined') {
       localStorage.removeItem('asterApiKey'); localStorage.removeItem('asterSecretKey');
-      const tradesKey = getTradesLocalStorageKey(); if (tradesKey) localStorage.removeItem(tradesKey); // Uses current apiKey, which is now empty
-      const incomeKey = getIncomeHistoryLocalStorageKey(); if (incomeKey) localStorage.removeItem(incomeKey); // Uses current apiKey
+      const tradesKey = getTradesLocalStorageKey(); if (tradesKey) localStorage.removeItem(tradesKey); 
+      const incomeKey = getIncomeHistoryLocalStorageKey(); if (incomeKey) localStorage.removeItem(incomeKey);
       localStorage.removeItem(ACCOUNT_SUMMARY_LS_KEY);
 
-      if (currentApiKeyForDisconnect) { // Explicitly use the old API key to clear its specific cache
+      if (currentApiKeyForDisconnect) { 
           const oldTradesKey = `${TRADES_LS_KEY_PREFIX}${currentApiKeyForDisconnect}`; localStorage.removeItem(oldTradesKey);
           const oldIncomeKey = `${INCOME_HISTORY_LS_KEY_PREFIX}${currentApiKeyForDisconnect}`; localStorage.removeItem(oldIncomeKey);
       }
@@ -812,7 +811,7 @@ export function AsterdexAccountCenter() {
     return pnl > 0 ? 'positive' : 'negative';
   };
 
-  const tradeMetricsScopeMessage = `Based on fetched & cached trades (up to ${INITIAL_TRADE_FETCH_LIMIT} recent per symbol initially, plus newer trades for symbols with active positions). May not reflect complete lifetime history for all symbols.`;
+  const tradeMetricsScopeMessage = `Based on fetched & cached trades (up to ${INITIAL_TRADE_FETCH_LIMIT} recent per symbol initially, plus newer trades for symbols with previous activity or current positions). May not reflect complete lifetime history for all symbols.`;
   const incomeHistoryScopeMessage = `Based on last ${INCOME_HISTORY_DAYS_LOOKBACK} days of income history (up to ${INCOME_FETCH_LIMIT} records).`;
 
   const showCardShimmer = isApiKeysSet && !error && isLoading;
@@ -824,12 +823,12 @@ export function AsterdexAccountCenter() {
           <h1 className="text-2xl font-bold text-foreground">Account Summary</h1>
           <p className="text-sm text-muted-foreground">Live overview of your AsterDEX account activity.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => loadAccountData(true)} disabled={isLoading || !isApiKeysSet}>
             <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> Refresh Data
           </Button>
           <span className={cn(
-            "text-xs px-2 py-1 rounded-full flex items-center gap-1",
+            "text-xs px-2 py-1 rounded-full flex items-center gap-1 whitespace-nowrap",
             webSocketStatus === 'Connected' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
               webSocketStatus === 'Connecting' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' :
                 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
@@ -839,7 +838,7 @@ export function AsterdexAccountCenter() {
           </span>
           <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button variant="outline" size="sm" className="gap-1.5 whitespace-nowrap">
                 <Settings size={16} /> API Settings
               </Button>
             </DialogTrigger>
@@ -848,13 +847,13 @@ export function AsterdexAccountCenter() {
                 <DialogTitle>AsterDex API Configuration</DialogTitle>
                 <CardDescription>Enter your API Key and Secret Key to fetch account data.</CardDescription>
               </DialogHeader>
-              <Alert variant="destructive" className="mt-4 mb-2">
+               <Alert variant="destructive" className="mt-4 mb-2">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Security Warning</AlertTitle>
                 <AlertDescription>
                   API keys are stored locally in your browser and are not sent to any server other than AsterDex.
                   For maximum security, it is strongly recommended to:
-                  <ul className="list-disc pl-5 mt-1">
+                  <ul className="list-disc pl-5 mt-1 text-xs">
                     <li>Create API keys with **restricted permissions** (e.g., read-only if you only need to view data).</li>
                     <li>Bind your API keys to **specific IP addresses** (IP Whitelisting) on the AsterDex platform.</li>
                   </ul>
@@ -871,14 +870,16 @@ export function AsterdexAccountCenter() {
                   <Input id="secretKey" type="password" value={tempSecretKey} onChange={(e) => setTempSecretKey(e.target.value)} className="col-span-3" placeholder="Enter your Secret Key" />
                 </div>
               </div>
-              <DialogFooter className="sm:justify-between">
+              <DialogFooter className="sm:justify-between flex-col-reverse sm:flex-row gap-2 sm:gap-0">
                 <Button type="button" variant="destructive" onClick={handleDisconnect} disabled={!isApiKeysSet}>
                   Disconnect & Clear Keys
                 </Button>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="button" onClick={handleSaveApiKeys}>Save & Connect</Button>
+                <div className="flex justify-end gap-2">
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button type="button" onClick={handleSaveApiKeys}>Save & Connect</Button>
+                </div>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -915,12 +916,12 @@ export function AsterdexAccountCenter() {
 
       {isApiKeysSet && !error && (
         <>
-          <h2 className="text-xl font-semibold text-foreground mt-2 mb-0">Account Summary</h2>
+          <h2 className="text-xl font-semibold text-foreground mt-2 mb-0">Account Performance</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <MetricCard
               title="Portfolio Value"
               value={formatUsd(accountData?.portfolioValue)}
-              description="Total margin balance (live)"
+              description="Total margin balance (live via WSS if connected)"
               icon={DollarSign}
               isLoading={showCardShimmer}
               className="lg:col-span-1"
@@ -928,7 +929,7 @@ export function AsterdexAccountCenter() {
             <MetricCard
               title="Total Unrealized PNL"
               value={formatUsd(accountData?.totalUnrealizedPNL)}
-              description="Live PNL on open positions"
+              description="Live PNL on open positions (via WSS if connected)"
               icon={TrendingDown}
               isLoading={showCardShimmer}
               variant={getPnlVariant(accountData?.totalUnrealizedPNL)}
@@ -953,7 +954,7 @@ export function AsterdexAccountCenter() {
               value={formatUsd(accountData?.totalFundingFees, 4)}
               description={<>Paid/Received. From Income History (last {INCOME_HISTORY_DAYS_LOOKBACK} days). {incomeHistoryScopeMessage}</>}
               icon={Landmark}
-              isLoading={showCardShimmer}
+              isLoading={showCardShimmer && (!accountData || (accountData.totalFundingFees === 0 && (!accountData.incomeHistory || accountData.incomeHistory.length === 0)))}
               variant={getPnlVariant(accountData && accountData.totalFundingFees != null ? -accountData.totalFundingFees : null)}
             />
             <MetricCard
@@ -989,24 +990,28 @@ export function AsterdexAccountCenter() {
               icon={BarChart3}
               isLoading={showCardShimmer}
             />
-             <MetricCard
+            <MetricCard
                 title="Today's Total Volume"
                 value={formatUsd(accountData?.todayTotalVolume)}
                 description={<>Current UTC Day. {tradeMetricsScopeMessage}</>}
                 icon={BarChart3}
                 isLoading={showCardShimmer}
             />
+          </div>
+          
+          <h2 className="text-xl font-semibold text-foreground mt-8 mb-0">Points Program Summary</h2>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
              <MetricCard
               title="Previous Day's Volume (Au Boost)"
               value={formatUsd(accountData?.previousDayVolumeAuBoost)}
-              description={<>Pro Taker + 0.5 * Maker (Previous UTC Day). {tradeMetricsScopeMessage}</>}
+              description={<>Pro Taker + 0.5 * Pro Maker (Previous UTC Day). {tradeMetricsScopeMessage}</>}
               icon={Zap}
               isLoading={showCardShimmer}
             />
             <MetricCard
               title="Au Trader Boost Factor"
               value={accountData?.auTraderBoost || "1x (Base)"}
-              description={<>Additional multiplier based on Previous Day's Volume. '1x (Base)' = no additional boost.</>}
+              description={<>Additional multiplier based on Previous Day's Volume. '1x (Base)' = no additional boost. {tradeMetricsScopeMessage}</>}
               icon={ArrowUpRightSquare}
               isLoading={showCardShimmer}
             />
@@ -1021,18 +1026,44 @@ export function AsterdexAccountCenter() {
         </>
       )}
 
-      <Card className="mt-6 bg-muted/30 dark:bg-muted/20 border-primary/30">
+      {ENABLE_INVITE_CODE_FEATURE && (
+        <Card className="mt-8 shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Gift className="h-5 w-5 text-primary" />
+              Referral Information
+            </CardTitle>
+            <CardDescription>
+              Use the code below or click the button to visit the AsterDex referral page.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center gap-4 pt-3 sm:flex-row sm:justify-between">
+            <div className="text-center sm:text-left">
+              <p className="text-sm text-muted-foreground">Your Invite Code:</p>
+              <p className="text-2xl font-bold tracking-wider text-primary">{INVITE_CODE}</p>
+            </div>
+            <Button asChild size="lg" className="w-full sm:w-auto">
+              <a href={INVITE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+                <ArrowUpRightSquare size={18} />
+                Use Referral Code
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mt-8 bg-muted/30 dark:bg-muted/20 border-primary/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Info size={18} className="text-primary" /> Points Program & Data Info
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground space-y-1.5">
-          <p><strong className="text-foreground">Data Caching:</strong> Core account summary (balances, positions), {INCOME_HISTORY_DAYS_LOOKBACK}-day income history, and recent trades are cached in your browser. Data is refreshed from APIs on load or when you use the 'Refresh' button.</p>
+          <p><strong className="text-foreground">Data Caching:</strong> Core account summary, {INCOME_HISTORY_DAYS_LOOKBACK}-day income history, and recent trades (up to {INITIAL_TRADE_FETCH_LIMIT} per symbol initially) are cached in your browser. Data is refreshed from APIs on load or when you use the 'Refresh' button.</p>
           <p><strong className="text-foreground">Realized PNL, Commissions, Funding Fees:</strong> Calculated from Income History API for the last {INCOME_HISTORY_DAYS_LOOKBACK} days (up to {INCOME_FETCH_LIMIT} records).</p>
           <p><strong className="text-foreground">Trade-Based Metrics:</strong> {tradeMetricsScopeMessage}</p>
           <p><strong className="text-foreground">Points Program:</strong> Au Trader Boost Factor is based on Previous Day's Volume (UTC). Rh Points are base values. Both exclude external boosts/referrals not derivable from trade/income data.</p>
-          <p><strong className="text-foreground">Real-time Updates:</strong> Balances/positions & Unrealized PNL update via WebSocket. Other metrics update on page load/refresh or when a new trade is detected via WebSocket (triggering a REST refresh of trade-dependent data).</p>
+          <p><strong className="text-foreground">Real-time Updates:</strong> Balances/positions & Unrealized PNL update via WebSocket if connected. Other metrics update on page load/refresh or when a new trade is detected via WebSocket (triggering a REST refresh of trade-dependent data).</p>
           <p><strong className="text-foreground">API Limits:</strong> Note: AsterDex API has a general limit of 2400 requests/minute. This component fetches key data on load and uses WebSockets for live balance/position updates to minimize REST calls. For comprehensive historical analytics, a backend data aggregation solution is recommended.</p>
         </CardContent>
       </Card>
