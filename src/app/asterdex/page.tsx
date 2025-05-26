@@ -3,14 +3,16 @@
 'use client';
 
 import React from 'react';
-import type { ExchangeAssetDetail, AsterOrderBookData, AsterOrderBookWebSocketMessage } from '@/types';
+import type { ExchangeAssetDetail, AsterOrderBookData } from '@/types';
 import { getAsterProcessedData } from '@/lib/aster-api';
 import { AssetDataTable } from '@/components/asset-data-table';
 import { CandlestickChart, ServerCrash, AlertTriangle } from 'lucide-react';
-import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
+// Removed direct import of AsterdexAccountCenter
+// import { AsterdexAccountCenter } from '@/components/asterdex-account-center';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit';
+import dynamic from 'next/dynamic';
 
 // IMPORTANT: Replace with your actual AdSense Publisher ID
 const ADSENSE_PUBLISHER_ID = "ca-pub-8597282005680903";
@@ -18,7 +20,30 @@ const ADSENSE_PUBLISHER_ID = "ca-pub-8597282005680903";
 const MID_PAGE_AD_SLOT_ID_ASTERDEX = "YOUR_MID_PAGE_AD_SLOT_ID_ASTERDEX";
 const FOOTER_AD_SLOT_ID_ASTERDEX = "YOUR_FOOTER_AD_SLOT_ID_ASTERDEX";
 
-// HMR Recovery comment
+// HMR Recovery comment 2
+// Dynamically import AsterdexAccountCenter with SSR disabled
+const AsterdexAccountCenter = dynamic(
+  () => import('@/components/asterdex-account-center').then(mod => mod.AsterdexAccountCenter),
+  { 
+    ssr: false,
+    loading: () => (
+      <Card className="shadow-md">
+        <CardHeader>
+          <CardTitle>Account Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-8 w-1/2" />
+            <Skeleton className="h-8 w-2/3" />
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+);
+
+
 export default function AsterDexPage() {
   const [exchangeData, setExchangeData] = React.useState<{ assets: ExchangeAssetDetail[] }>({ assets: [] });
   const [isLoadingPageData, setIsLoadingPageData] = React.useState(true);
@@ -36,7 +61,7 @@ export default function AsterDexPage() {
              console.warn("AsterDex: No assets returned from getAsterProcessedData for page display.");
           }
         } else {
-           console.error("Failed to load critical AsterDex data in page component.");
+           console.warn("Failed to load critical AsterDex data in page component.");
            setPageError("Could not load essential exchange data. The AsterDex API might be temporarily unavailable or experiencing issues.");
            setExchangeData({ assets: [] }); // Ensure assets is an empty array on error
         }
@@ -61,7 +86,19 @@ export default function AsterDexPage() {
             AsterDex Exchange
           </h1>
         </header>
-        <Skeleton className="h-64 w-full mb-6 rounded-lg" />
+        {/* Skeleton for Account Center during dynamic load */}
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>Account Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-8 w-1/2" />
+              <Skeleton className="h-8 w-2/3" />
+            </div>
+          </CardContent>
+        </Card>
         <Skeleton className="h-[400px] w-full mb-6 rounded-lg" />
         <Skeleton className="h-96 w-full rounded-lg" />
       </div>

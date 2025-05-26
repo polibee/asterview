@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef } from 'react';
 
-interface AdSenseAdUnitProps extends React.HTMLAttributes<HTMLModElement> {
+interface AdSenseAdUnitProps extends React.HTMLAttributes<HTMLDivElement> { // Changed HTMLModElement to HTMLDivElement
   adClient: string; // e.g., "ca-pub-YOUR_PUBLISHER_ID"
   adSlotId: string; // e.g., "YOUR_AD_SLOT_ID"
   adFormat?: string; // e.g., "auto", "rectangle", "vertical", "horizontal"
@@ -86,7 +86,6 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
       style={{
         display: 'block', // Ensure the container is block-level
         width: '100%',    // Attempt to take full width of parent
-        minHeight: '50px', // Provide a minimum height
         textAlign: 'center', // Center the ad if it's narrower than the container
         ...style,
       }}
@@ -104,5 +103,3 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
     </div>
   );
 };
-    
-    

@@ -30,9 +30,10 @@ async function makeAsterAuthenticatedRequest<T>(
   }
 
   const currentClientTime = Date.now();
-  const requestTimestamp = serverTimeOffset !== undefined && serverTimeOffset !== null
-    ? currentClientTime + serverTimeOffset
-    : currentClientTime;
+  // Ensure serverTimeOffset is a number before using it
+  const effectiveServerTimeOffset = typeof serverTimeOffset === 'number' ? serverTimeOffset : 0;
+  const requestTimestamp = currentClientTime + effectiveServerTimeOffset;
+
 
   const queryParams = { ...params, timestamp: requestTimestamp, recvWindow: 5000 };
 
@@ -73,12 +74,9 @@ async function makeAsterAuthenticatedRequest<T>(
     }
     
     if (responseBodyText.trim() === '' || responseBodyText.trim() === '{}') {
-        // For PUT/DELETE, an empty {} or "" is often a success signal
         if (response.status === 200 && (method === 'PUT' || method === 'DELETE')) {
-            return {} as T; // Return an empty object cast to T
+            return {} as T; 
         }
-        // For GET/POST, if a non-empty response is expected, this might be an issue
-        // But if specific endpoints can return empty objects on success, this is fine
     }
     
     try {
@@ -112,14 +110,6 @@ export async function fetchAsterPositions(apiKey: string, secretKey: string, ser
   if (symbol) {
     params.symbol = symbol;
   }
-  // This endpoint /fapi/v2/positionRisk returns all positions if symbol is not provided.
-  // AccountInfo from /fapi/v2/account also contains positions. Choose one source or combine.
-  // For simplicity, often /fapi/v2/account is preferred as it gives a snapshot with balances.
-  // If you need more detailed risk metrics per position not in /account, then /positionRisk is used.
-  // Assuming positions from /account are sufficient for now.
-  // If specific risk data is needed, this function would be used.
-  // For now, returning positions from AccountInfo is done in the component.
-  // This function can be kept for future specific position risk fetching.
   return makeAsterAuthenticatedRequest<AsterPositionV2[]>(`${ASTER_API_V2_BASE_URL}/positionRisk`, 'GET', apiKey, secretKey, params, serverTimeOffset);
 }
 
@@ -128,7 +118,7 @@ export async function fetchAsterUserTrades(
   secretKey: string,
   symbol: string,
   serverTimeOffset?: number,
-  limit: number = 500, // Default 500, max 1000
+  limit: number = 500, 
   fromId?: number,
   startTime?: number,
   endTime?: number
@@ -153,7 +143,7 @@ export async function fetchAsterIncomeHistory(
     symbol?: string,
     startTime?: number,
     endTime?: number,
-    limit: number = 1000 // Max limit is 1000, default is 100
+    limit: number = 1000 
 ): Promise<AsterIncomeHistoryItem[]> {
     const params: Record<string, any> = { limit };
     if (incomeType) params.incomeType = incomeType;
@@ -188,7 +178,6 @@ export async function createAsterListenKey(apiKey: string): Promise<AsterListenK
       console.warn(networkErrorMsg);
       throw new Error(networkErrorMsg);
     }
-    // Re-throw other errors or already specific errors
     if (!error.message.startsWith("ListenKey creation failed") && !error.message.startsWith("Network error")) {
         console.error('Failed to create Aster ListenKey (unexpected):', error.message);
         throw new Error(`Failed to create Aster ListenKey: ${error.message}`);
@@ -197,13 +186,13 @@ export async function createAsterListenKey(apiKey: string): Promise<AsterListenK
   }
 }
 
-export async function keepAliveAsterListenKey(apiKey: string): Promise<Record<string, unknown>> {
-  if (!apiKey) {
-    console.error('API key is missing for keepAlive.');
-    throw new Error('API key is missing for keepAlive.');
+export async function keepAliveAsterListenKey(apiKey: string, listenKey: string): Promise<Record<string, unknown>> {
+  if (!apiKey || !listenKey) {
+    console.error('API key or listenKey is missing for keepAlive.');
+    throw new Error('API key or listenKey is missing for keepAlive.');
   }
   try {
-    const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
+    const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, { // Removed listenKey from params
       method: 'PUT',
       headers: { 'X-MBX-APIKEY': apiKey },
     });
@@ -231,13 +220,13 @@ export async function keepAliveAsterListenKey(apiKey: string): Promise<Record<st
   }
 }
 
-export async function deleteAsterListenKey(apiKey: string): Promise<Record<string, unknown>> {
-   if (!apiKey) {
-    console.error('API key is missing for delete.');
-    throw new Error('API key is missing for delete.');
+export async function deleteAsterListenKey(apiKey: string, listenKey: string): Promise<Record<string, unknown>> {
+   if (!apiKey || !listenKey) {
+    console.error('API key or listenKey is missing for delete.');
+    throw new Error('API key or listenKey is missing for delete.');
   }
   try {
-    const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, {
+    const response = await fetch(`${ASTER_API_BASE_URL}/listenKey`, { // Removed listenKey from params
       method: 'DELETE',
       headers: { 'X-MBX-APIKEY': apiKey },
     });
