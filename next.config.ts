@@ -14,14 +14,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 's3-ap-northeast-1.amazonaws.com',
-        port: '',
-        pathname: '/**',
       },
     ],
   },
