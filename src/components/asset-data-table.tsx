@@ -55,10 +55,10 @@ const formatPrice = (price: number | undefined | null, defaultPrecision = 2, hig
   let minimumFractionDigits = defaultPrecision;
   let maximumFractionDigits = defaultPrecision;
 
-  if (price > 0 && Math.abs(price) < 0.000001) { 
+  if (price > 0 && Math.abs(price) < 0.000001) {
     return `$${price.toExponential(2)}`;
   } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 1000) {
-    minimumFractionDigits = Math.min(8, defaultPrecision + 4); 
+    minimumFractionDigits = Math.min(8, defaultPrecision + 4);
     maximumFractionDigits = Math.min(8, defaultPrecision + 4);
   } else if (price > 0 && Math.abs(price) < highPrecisionThreshold / 100) {
     minimumFractionDigits = Math.min(6, defaultPrecision + 3);
@@ -142,7 +142,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
 
         if (message.stream === '!ticker@arr' && Array.isArray(message.data)) {
           priceUpdates = message.data.map((ticker: any) => ({
-            id: ticker.s,
+            id: ticker.s, // Symbol is used as ID
             price: parseFloatSafe(ticker.c) ?? 0
           }));
         }
@@ -175,9 +175,11 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     };
 
     return () => {
-      ws.close();
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
     };
-  }, [isClient, exchangeName, internalAssets.length]); 
+  }, [isClient, exchangeName, internalAssets.length]); // Added internalAssets.length to re-run if assets list changes
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -221,7 +223,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
       <ArrowUpDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
-  const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string; numeric?: boolean; sticky?: 'left'; stickyOffset?: string; minWidth?: string, width?: string; }[] = [
+  const columns: { key: SortKey; label: string; icon?: React.ElementType; className?: string; numeric?: boolean; sticky?: 'left'; stickyOffset?: string; minWidth?: string; width?: string; }[] = [
     { key: '', label: '#', className: "w-[40px] text-center", sticky: 'left', stickyOffset: '0px', minWidth: '40px', width: '40px' },
     { key: 'symbol', label: 'Symbol', className: "w-[180px] md:w-[200px]", sticky: 'left', stickyOffset: '40px', minWidth: '180px', width: '180px' },
     { key: 'price', label: 'Price', numeric: true, minWidth: '120px' },
@@ -246,7 +248,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             {exchangeName} Assets
           </CardTitle>
         </CardHeader>
-        <CardContent className="h-[600px] flex items-center justify-center">
+        <CardContent className="p-0 h-[600px] flex items-center justify-center">
           <div className="flex items-center text-muted-foreground">
             <Info size={16} className="mr-2" /> Loading asset data...
           </div>
@@ -286,10 +288,10 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                       col.key ? 'cursor-pointer hover:bg-muted/50' : '',
                       col.numeric ? 'text-right' : 'text-left',
                       col.sticky === 'left' ? 'sticky z-10' : '',
-                      colIndex === 1 ? 'border-r' : '' 
+                      colIndex === 1 ? 'border-r' : ''
                   )}
-                  style={{ 
-                      left: col.sticky === 'left' ? col.stickyOffset : undefined, 
+                  style={{
+                      left: col.sticky === 'left' ? col.stickyOffset : undefined,
                       minWidth: col.minWidth,
                       width: col.width,
                       backgroundColor: 'hsl(var(--card))',
@@ -320,8 +322,8 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                       colIndex === 1 ? 'border-r' : ''
                     )}
                      style={{
-                      left: col.sticky === 'left' ? col.stickyOffset : undefined, 
-                      backgroundColor: 'hsl(var(--card))', 
+                      left: col.sticky === 'left' ? col.stickyOffset : undefined,
+                      backgroundColor: 'hsl(var(--card))',
                       minWidth: col.minWidth,
                       width: col.width,
                      }}
@@ -329,7 +331,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
                     {col.key === '' ? index + 1 :
                      col.key === 'symbol' ? (
                       <div className="flex items-center gap-2">
-                        {item.iconUrl && <Image data-ai-hint={`${item.symbol?.replace(/USDT$/, '').replace(/PERP$/, '').substring(0,10) || 'crypto'} logo`} src={item.iconUrl} alt={item.symbol || 'asset icon'} width={18} height={18} className="rounded-full shrink-0" />}
+                        {item.iconUrl && <Image data-ai-hint={`${item.baseAsset?.toLowerCase() || item.symbol?.replace(/USDT$/, '').replace(/PERP$/, '').substring(0,10) || 'crypto'} icon`} src={item.iconUrl} alt={item.symbol || 'asset icon'} width={18} height={18} className="rounded-full shrink-0" />}
                         <span className="font-medium truncate" title={item.symbol}>{item.symbol}</span>
                       </div>
                      ) :
@@ -352,7 +354,7 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
             )) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground py-3 px-4 text-xs sm:text-sm">
-                  {initialAssets && initialAssets.length === 0 ? `No data available for ${exchangeName}.` : `No assets match "${searchTerm}".`}
+                  {(initialAssets === null || initialAssets.length === 0) && searchTerm === '' ? `No data available for ${exchangeName}.` : `No assets match "${searchTerm}".`}
                 </TableCell>
               </TableRow>
             )}
@@ -367,5 +369,3 @@ export function AssetDataTable({ initialAssets, exchangeName }: AssetDataTablePr
     </Card>
   );
 }
-
-    
