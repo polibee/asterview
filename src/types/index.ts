@@ -129,47 +129,47 @@ export interface AsterOrderBookWebSocketMessage {
 export interface AsterAccountBalanceV2 {
   accountAlias: string;
   asset: string;
-  a?: string;
+  a?: string; // For WebSocket
   balance: string;
-  wb?: string;
+  wb?: string; // For WebSocket
   crossWalletBalance: string;
-  cw?: string;
+  cw?: string; // For WebSocket
   crossUnPnl?: string;
   availableBalance: string;
   maxWithdrawAmount: string;
   marginAvailable: boolean;
   updateTime: number;
-  bc?: string;
+  bc?: string; // For WebSocket
 }
 
 export interface AsterPositionV2 {
   symbol: string;
-  s?: string;
+  s?: string; // For WebSocket
   initialMargin: string;
   maintMargin: string;
   unrealizedProfit: string;
-  up?: string;
+  up?: string; // For WebSocket
   positionInitialMargin: string;
   openOrderInitialMargin: string;
   leverage: string;
   isolated: boolean;
   entryPrice: string;
-  ep?: string;
+  ep?: string; // For WebSocket
   maxNotional: string;
   positionSide: 'BOTH' | 'LONG' | 'SHORT';
-  ps?: 'BOTH' | 'LONG' | 'SHORT';
+  ps?: 'BOTH' | 'LONG' | 'SHORT'; // For WebSocket
   positionAmt: string;
-  pa?: string;
+  pa?: string; // For WebSocket
   updateTime: number;
-  mt?: 'isolated' | 'cross';
-  iw?: string;
-  cr?: string;
-  marginType?: "isolated" | "cross" | string; // string to be more flexible
-  isAutoAddMargin?: "true" | "false" | string;
-  isolatedMargin?: string;
-  liquidationPrice?: string;
-  markPrice?: string;
-  maxNotionalValue?: string;
+  mt?: 'isolated' | 'cross'; // Margin Type from WebSocket
+  iw?: string; // Isolated Wallet from WebSocket
+  cr?: string; // (Pre-fee) Accumulated Realized from WebSocket
+  marginType?: "isolated" | "cross" | string; // From REST
+  isAutoAddMargin?: "true" | "false" | string; // From REST
+  isolatedMargin?: string; // From REST & WebSocket
+  liquidationPrice?: string; // From REST
+  markPrice?: string; // From REST
+  maxNotionalValue?: string; // From REST
 }
 
 export interface AsterAccountInfoV2Asset {
@@ -238,14 +238,14 @@ export interface AsterListenKey {
 }
 
 export interface AsterIncomeHistoryItem {
-    symbol: string;      // trade symbol, if existing
-    incomeType: "TRANSFER" | "WELCOME_BONUS" | "REALIZED_PNL" | "FUNDING_FEE" | "COMMISSION" | "INSURANCE_CLEAR" | "MARKET_MERCHANT_RETURN_REWARD" | string; // income type
-    income: string;      // income amount
-    asset: string;       // income asset
-    info: string;        // extra information
+    symbol: string;
+    incomeType: "TRANSFER" | "WELCOME_BONUS" | "REALIZED_PNL" | "FUNDING_FEE" | "COMMISSION" | "INSURANCE_CLEAR" | "MARKET_MERCHANT_RETURN_REWARD" | string;
+    income: string;
+    asset: string;
+    info: string;
     time: number;
-    tranId: string;      // transaction id
-    tradeId: string;     // trade id, if existing
+    tranId: string;
+    tradeId: string;
 }
 
 
@@ -265,9 +265,11 @@ export interface AsterWebSocketUpdateAccountDataPosition {
   mt: 'isolated' | 'cross'; // Margin Type
   iw: string; // Isolated Wallet (if isolated position)
   ps: 'BOTH' | 'LONG' | 'SHORT'; // Position Side
+  imr?: string; // Initial Margin Rate (Added)
+  mm?: string; // Maintenance Margin (Added)
 }
 export interface AsterWebSocketUpdateAccountData {
-  m: string; // Event reason type
+  m: string; // Event reason type ('ORDER', 'FUNDING_FEE', etc.)
   B: AsterWebSocketUpdateAccountDataBalance[]; // Balances
   P: AsterWebSocketUpdateAccountDataPosition[]; // Positions
 }
@@ -278,7 +280,36 @@ export interface AsterWebSocketUpdateAccount {
   a: AsterWebSocketUpdateAccountData; // Update Data
 }
 export interface AsterWebSocketOrderUpdateData {
-  s: string; c: string; S: 'BUY' | 'SELL'; o: string; f: string; q: string; p: string; ap: string; sp: string; x: string; X: string; i: number; l: string; z: string; L: string; N?: string; n?: string; T: number; t: number; b: string; a: string; m: boolean; R: boolean; wt: string; ot: string; ps: 'BOTH' | 'LONG' | 'SHORT'; cp: boolean; AP?: string; cr?: string; rp: string;
+  s: string; // Symbol
+  c: string; // Client Order ID
+  S: 'BUY' | 'SELL'; // Side
+  o: string; // Order Type
+  f: string; // Time in Force
+  q: string; // Original Quantity
+  p: string; // Original Price
+  ap: string; // Average Price
+  sp: string; // Stop Price
+  x: string; // Execution Type
+  X: string; // Order Status
+  i: number; // Order ID
+  l: string; // Order Last Filled Quantity
+  z: string; // Order Filled Accumulated Quantity
+  L: string; // Last Filled Price
+  N?: string; // Commission Asset (if different from Main Asset)
+  n?: string; // Commission Amount (if different from Main Asset)
+  T: number; // Transaction Time
+  t: number; // Trade ID
+  b: string; // Bid Notional
+  a: string; // Ask Notional
+  m: boolean; // Is this trade the maker?
+  R: boolean; // Is an order on the book?
+  wt: string; // Working Type
+  ot: string; // Original Order Type
+  ps: 'BOTH' | 'LONG' | 'SHORT'; // Position Side
+  cp: boolean; // If Close-All, pushed with conditional order
+  AP?: string; // Trailing Stop Activation Price
+  cr?: string; // Trailing Stop Callback Rate
+  rp: string; // Realized Pnl
 }
 export interface AsterWebSocketUpdateOrder {
   e: "ORDER_TRADE_UPDATE"; E: number; T: number; o: AsterWebSocketOrderUpdateData;
@@ -291,11 +322,11 @@ export interface AsterWebSocketListenKeyExpired {
 export interface ExchangeAssetDetail {
   id: string;
   symbol: string;
-  baseAsset?: string; // Added this optional field
+  baseAsset?: string;
   price: number;
-  dailyVolume: number; // Quote asset volume
+  dailyVolume: number;
   baseAssetVolume24h?: number;
-  openInterest: number | null; // Quote asset volume
+  openInterest: number | null;
   dailyTrades: number;
   fundingRate: number | null;
   nextFundingTime: number | null;
@@ -344,7 +375,7 @@ export interface AsterAccountSummaryData {
   previousDayVolumeAuBoost: number;
   auTraderBoost: string | null;
   rhPointsTotal: number;
-  todayTotalVolume: number; // Current UTC day's volume
+  todayTotalVolume: number;
   totalFundingFees: number; // Sum of FUNDING_FEE from income history
   totalCommissions: number; // Sum of COMMISSION from income history
   balances?: AsterAccountBalanceV2[];
@@ -361,9 +392,12 @@ export interface CachedSymbolTrades {
   trades: AsterUserTrade[];
   newestTradeId: number | null;
   oldestTradeIdKnown: number | null;
-  allHistoryFetched?: boolean; // Flag to indicate if we think we've fetched all history
+  allHistoryFetched?: boolean;
 }
 
 export interface AllCachedTrades {
     [symbol: string]: CachedSymbolTrades;
 }
+
+// HMR Recovery Comment
+export {}; // Ensures this file is treated as a module
