@@ -76,7 +76,7 @@ export async function fetchAsterOpenInterest(symbol: string): Promise<AsterOpenI
     if (!response.ok) {
       // Avoid console logging for 400 errors if it's just "Invalid symbol" as this can be noisy.
       // Other errors (like rate limits or server issues) should still be logged.
-      if (response.status !== 400) { 
+      if (response.status !== 400) {
          console.warn(`Aster API error (openInterest for ${symbol}): ${response.status} ${await response.text()}`);
       }
       return null;
@@ -140,7 +140,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     console.warn("AsterDex: Failed to fetch critical initial data (symbols or tickers). Returning empty.");
     return { metrics: { totalDailyVolume: 0, totalOpenInterest: 0, totalDailyTrades: 0 }, assets: [] };
   }
-  
+
   let totalDailyVolume = 0;
   let totalOpenInterest = 0;
   let totalDailyTrades = 0;
@@ -160,8 +160,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
   const openInterestDataMap = new Map<string, AsterOpenInterest | null>();
 
   for (const ticker of sortedTickersForOI) {
-    // Add a small delay to be extremely cautious with rate limits, even for a smaller loop.
-    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay as we loop fewer times
+    await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
     const oiData = await fetchAsterOpenInterest(ticker.symbol);
     openInterestDataMap.set(ticker.symbol, oiData);
   }
@@ -176,24 +175,25 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
 
     totalDailyVolume += dailyVolumeQuote;
     totalDailyTrades += dailyTrades;
-    
+
     let openInterestValue = 0;
     const oiData = openInterestDataMap.get(symbolInfo.symbol); // Get pre-fetched OI if available
     if (oiData) {
       const oiBase = parseFloatSafe(oiData.openInterest) ?? 0;
-      openInterestValue = oiBase * price; 
+      openInterestValue = oiBase * price;
       totalOpenInterest += openInterestValue;
     }
 
     const premiumIndex = premiumIndexMap.get(symbolInfo.symbol);
-    
+
     assets.push({
       id: symbolInfo.symbol,
-      symbol: symbolInfo.symbol, 
+      symbol: symbolInfo.symbol,
+      baseAsset: symbolInfo.baseAsset, // Populate baseAsset
       price: price,
       dailyVolume: dailyVolumeQuote,
       baseAssetVolume24h: parseFloatSafe(ticker.volume),
-      openInterest: openInterestDataMap.has(symbolInfo.symbol) ? openInterestValue : null, // Set to null if OI wasn't fetched
+      openInterest: openInterestDataMap.has(symbolInfo.symbol) ? openInterestValue : null,
       dailyTrades: dailyTrades,
       fundingRate: premiumIndex ? parseFloatSafe(premiumIndex.lastFundingRate, true) : null,
       nextFundingTime: premiumIndex ? premiumIndex.nextFundingTime : null,
@@ -202,12 +202,12 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       low24h: parseFloatSafe(ticker.lowPrice, true),
       markPrice: premiumIndex ? parseFloatSafe(premiumIndex.markPrice, true) : null,
       indexPrice: premiumIndex ? parseFloatSafe(premiumIndex.indexPrice, true) : null,
-      oraclePrice: null, // Aster doesn't provide oraclePrice in these endpoints
+      oraclePrice: null,
       exchange: 'Aster',
-      iconUrl: `https://s3-ap-northeast-1.amazonaws.com/file.fmex.com/imgs/coin_new/${symbolInfo.baseAsset.toLowerCase()}.png`, // Example dynamic icon URL pattern
+      iconUrl: `https://s3-ap-northeast-1.amazonaws.com/file.fmex.com/imgs/coin_new/${symbolInfo.baseAsset.toLowerCase()}.png`,
     });
   }
-  
+
   return {
     metrics: {
       totalDailyVolume,
@@ -217,5 +217,3 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     assets: assets.sort((a, b) => (b.dailyVolume ?? 0) - (a.dailyVolume ?? 0)),
   };
 }
-
-    

@@ -129,41 +129,41 @@ export interface AsterOrderBookWebSocketMessage {
 export interface AsterAccountBalanceV2 {
   accountAlias: string;
   asset: string;
-  a?: string; 
+  a?: string;
   balance: string;
-  wb?: string; 
+  wb?: string;
   crossWalletBalance: string;
-  cw?: string; 
+  cw?: string;
   crossUnPnl?: string;
   availableBalance: string;
   maxWithdrawAmount: string;
   marginAvailable: boolean;
   updateTime: number;
-  bc?: string; 
+  bc?: string;
 }
 
 export interface AsterPositionV2 {
   symbol: string;
-  s?: string; 
+  s?: string;
   initialMargin: string;
   maintMargin: string;
   unrealizedProfit: string;
-  up?: string; 
+  up?: string;
   positionInitialMargin: string;
   openOrderInitialMargin: string;
   leverage: string;
   isolated: boolean;
   entryPrice: string;
-  ep?: string; 
+  ep?: string;
   maxNotional: string;
   positionSide: 'BOTH' | 'LONG' | 'SHORT';
-  ps?: 'BOTH' | 'LONG' | 'SHORT'; 
+  ps?: 'BOTH' | 'LONG' | 'SHORT';
   positionAmt: string;
-  pa?: string; 
+  pa?: string;
   updateTime: number;
-  mt?: 'isolated' | 'cross'; 
-  iw?: string; 
-  cr?: string; 
+  mt?: 'isolated' | 'cross';
+  iw?: string;
+  cr?: string;
   marginType?: "isolated" | "cross" | string; // string to be more flexible
   isAutoAddMargin?: "true" | "false" | string;
   isolatedMargin?: string;
@@ -243,7 +243,7 @@ export interface AsterIncomeHistoryItem {
     income: string;      // income amount
     asset: string;       // income asset
     info: string;        // extra information
-    time: number;        
+    time: number;
     tranId: string;      // transaction id
     tradeId: string;     // trade id, if existing
 }
@@ -291,10 +291,11 @@ export interface AsterWebSocketListenKeyExpired {
 export interface ExchangeAssetDetail {
   id: string;
   symbol: string;
+  baseAsset?: string; // Added this optional field
   price: number;
   dailyVolume: number; // Quote asset volume
-  baseAssetVolume24h?: number; 
-  openInterest: number; // Quote asset volume
+  baseAssetVolume24h?: number;
+  openInterest: number | null; // Quote asset volume
   dailyTrades: number;
   fundingRate: number | null;
   nextFundingTime: number | null;
@@ -303,7 +304,7 @@ export interface ExchangeAssetDetail {
   low24h: number | null;
   markPrice: number | null;
   indexPrice: number | null;
-  oraclePrice?: number | null; 
+  oraclePrice?: number | null;
   exchange: 'Aster';
   iconUrl?: string;
 }
@@ -328,20 +329,20 @@ export type UnifiedOrderBookEntry = {
 export interface AsterAccountSummaryData {
   portfolioValue: number | null;
   totalUnrealizedPNL: number | null;
-  totalRealizedPNL: number; 
-  totalTrades: number; 
-  longTrades: number; 
-  shortTrades: number; 
-  totalVolume: number; 
-  longVolume: number; 
-  shortVolume: number; 
+  totalRealizedPNL: number;
+  totalTrades: number;
+  longTrades: number;
+  shortTrades: number;
+  totalVolume: number;
+  longVolume: number;
+  shortVolume: number;
   totalFeesPaid: number; // Sum of commissions from TRADES (for latestFee display logic)
   latestFee: number | null; // Latest single trade commission
   commissionRateTaker: string | null;
   commissionRateMaker: string | null;
   commissionSymbol: string | null;
-  previousDayVolumeAuBoost: number; 
-  auTraderBoost: string | null; 
+  previousDayVolumeAuBoost: number;
+  auTraderBoost: string | null;
   rhPointsTotal: number;
   todayTotalVolume: number; // Current UTC day's volume
   totalFundingFees: number; // Sum of FUNDING_FEE from income history
@@ -350,16 +351,17 @@ export interface AsterAccountSummaryData {
   accountInfo?: AsterAccountInfoV2;
   positions?: AsterPositionV2[];
   webSocketStatus: 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
-  lastUpdated?: number;
+  lastUpdated?: number; // Timestamp for the overall summary data
   incomeHistory?: AsterIncomeHistoryItem[];
+  userTrades?: AsterUserTrade[]; // This will hold the consolidated trades
 }
 
 // For caching trades
 export interface CachedSymbolTrades {
   trades: AsterUserTrade[];
-  newestTradeId: number | null; 
-  oldestTradeIdKnown: number | null; 
-  allHistoryFetched?: boolean; 
+  newestTradeId: number | null;
+  oldestTradeIdKnown: number | null;
+  allHistoryFetched?: boolean; // Flag to indicate if we think we've fetched all history
 }
 
 export interface AllCachedTrades {
