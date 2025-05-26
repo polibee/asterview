@@ -5,8 +5,6 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { HeaderNav } from '@/components/layout/header-nav';
 import Script from 'next/script';
-// Removed AdSenseAdUnit import as it's not used directly here anymore for the header ad, but could be for body ads.
-// import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit'; 
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -25,7 +23,6 @@ export const metadata: Metadata = {
 
 // Updated with the user's AdSense Publisher ID
 const ADSENSE_PUBLISHER_ID = "ca-pub-8597282005680903"; 
-// Example: const HEADER_AD_SLOT_ID = "YOUR_HEADER_AD_SLOT_ID"; // This specific slot is now handled in header-nav.tsx
 
 
 export default function RootLayout({
@@ -45,9 +42,13 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex flex-col min-h-screen`}>
         <HeaderNav />
-        {/* If you want a banner ad directly below the header but outside of its sticky behavior, you could place an <AdSenseAdUnit> here */}
-        {/* Example: <AdSenseAdUnit adClient={ADSENSE_PUBLISHER_ID} adSlotId={SOME_OTHER_SLOT_ID} className="my-2 container" /> */}
-
+        {/* The main content padding-top might need adjustment if the header height changed significantly.
+            The header itself is h-14. Current padding-top on main is calc(3.5rem + 1rem) or similar.
+            3.5rem = 56px = h-14. The extra 1rem or 1.5rem is for spacing.
+            Removing the ad unit might have reduced the perceived header height if the ad had substantial padding.
+            If the HeaderNav's outer <header> tag no longer has extra vertical padding from the ad container, 
+            the current padding on <main> should still be appropriate.
+         */}
         <main className="flex-grow container mx-auto px-4 md:px-6 py-8 pt-[calc(3.5rem+1rem)] sm:pt-[calc(3.5rem+1.5rem)]"> {/* Adjusted padding-top slightly */}
           {children}
         </main>

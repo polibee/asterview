@@ -8,16 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import React from 'react';
-import { AdSenseAdUnit } from '@/components/ads/adsense-ad-unit'; // Import the AdSense component
+// Removed AdSenseAdUnit import
 
 const navigationItems = [
   { href: '/', label: 'Overview' },
   { href: '/asterdex', label: 'AsterDex' },
 ];
 
-// AdSense configuration provided by the user
-const HEADER_AD_CLIENT = "ca-pub-8597282005680903";
-const HEADER_AD_SLOT = "2624504622";
+// Removed AdSense constants for header
 
 export function HeaderNav() {
   const pathname = usePathname();
@@ -90,19 +88,7 @@ export function HeaderNav() {
           </Sheet>
         </div>
       </div>
-      {/* AdSense Ad Unit integrated into the header */}
-      {/* You might want to wrap this in a div and style its container, e.g., for centering or width */}
-      <div className="container mx-auto px-4 md:px-6 py-2 flex justify-center"> {/* Example container for ad */}
-        <AdSenseAdUnit
-          adClient={HEADER_AD_CLIENT}
-          adSlotId={HEADER_AD_SLOT}
-          adFormat="auto"
-          responsive={true}
-          className="block text-center" // Ensures it's block and centered if parent has text-align:center
-          // You may need to adjust styling here or in the AdSenseAdUnit component 
-          // if the ad doesn't display correctly (e.g., due to parent constraints)
-        />
-      </div>
+      {/* AdSense Ad Unit removed from header */}
     </header>
   );
 }
