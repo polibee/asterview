@@ -1,4 +1,4 @@
-# EdgeView - AsterDex Exchange Data Visualizer
+# EdgeView - AsterDex Exchange Data 
 
 EdgeView is a Next.js application designed to display and visualize data from the AsterDex cryptocurrency exchange. It provides an overview of market assets and a detailed account center for users to track their performance and activity on AsterDex.
 
