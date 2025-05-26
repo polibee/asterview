@@ -31,11 +31,16 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
   const pushedOnce = useRef(false);
 
   useEffect(() => {
-    // Don't proceed if placeholder IDs are used
-    if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
-      if (adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
-        // console.warn(`AdSenseAdUnit: Placeholder adClient or adSlotId used for slot ${adSlotId}. Ad will not be rendered.`);
-      }
+    // Don't proceed if slot ID is a placeholder (e.g., "YOUR_...")
+    // Allow adClient to be a placeholder here, as it might be set globally for the script
+    // and passed down, but a specific ad unit requires a specific slot ID.
+    if (!adSlotId || adSlotId.startsWith("YOUR_")) {
+      // console.warn(`AdSenseAdUnit: Placeholder adSlotId used ("${adSlotId}"). Ad will not be rendered.`);
+      return;
+    }
+     // Don't proceed if client ID is a placeholder
+    if (!adClient || adClient.startsWith("ca-pub-YOUR_")) {
+      // console.warn(`AdSenseAdUnit: Placeholder adClient used ("${adClient}") for slot ${adSlotId}. Ad will not be rendered.`);
       return;
     }
 
@@ -66,7 +71,7 @@ export const AdSenseAdUnit: React.FC<AdSenseAdUnitProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array: run once after component mounts
 
-  if (!adSlotId || !adClient || adSlotId.startsWith("YOUR_") || adClient.startsWith("ca-pub-YOUR_")) {
+  if (!adSlotId || adSlotId.startsWith("YOUR_") || !adClient || adClient.startsWith("ca-pub-YOUR_")) {
     return null; // Don't render if slot or client ID is a placeholder
   }
 
