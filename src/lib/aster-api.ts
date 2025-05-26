@@ -189,10 +189,10 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
     assets.push({
       id: symbolInfo.symbol,
       symbol: symbolInfo.symbol,
-      baseAsset: symbolInfo.baseAsset, // Populate baseAsset
+      baseAsset: symbolInfo.baseAsset,
       price: price,
       dailyVolume: dailyVolumeQuote,
-      baseAssetVolume24h: parseFloatSafe(ticker.volume),
+      baseAssetVolume24h: parseFloatSafe(ticker.volume) ?? undefined,
       openInterest: openInterestDataMap.has(symbolInfo.symbol) ? openInterestValue : null,
       dailyTrades: dailyTrades,
       fundingRate: premiumIndex ? parseFloatSafe(premiumIndex.lastFundingRate, true) : null,
@@ -202,7 +202,7 @@ export async function getAsterProcessedData(): Promise<{ metrics: ExchangeAggreg
       low24h: parseFloatSafe(ticker.lowPrice, true),
       markPrice: premiumIndex ? parseFloatSafe(premiumIndex.markPrice, true) : null,
       indexPrice: premiumIndex ? parseFloatSafe(premiumIndex.indexPrice, true) : null,
-      oraclePrice: null,
+      oraclePrice: null, // Aster doesn't typically provide this in basic ticker/premiumIndex
       exchange: 'Aster',
       iconUrl: `https://s3-ap-northeast-1.amazonaws.com/file.fmex.com/imgs/coin_new/${symbolInfo.baseAsset.toLowerCase()}.png`,
     });
